@@ -170,3 +170,5 @@ DocStudioDeletePageN = Delete page %s
 DocStudioRestorePageN = Keep page %s
 DocStudioToolCheck = Check
 DocStudioHintCheck = Click on a box to check it, click on the check again to remove it.
+DocStudioToolCross = Cross
+DocStudioToolDot = Filled circle

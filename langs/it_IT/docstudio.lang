@@ -170,3 +170,5 @@ DocStudioDeletePageN = Elimina la pagina %s
 DocStudioRestorePageN = Mantieni la pagina %s
 DocStudioToolCheck = Spunta
 DocStudioHintCheck = Fate clic su una casella per spuntarla, fate di nuovo clic sulla spunta per toglierla.
+DocStudioToolCross = Croce
+DocStudioToolDot = Cerchio pieno

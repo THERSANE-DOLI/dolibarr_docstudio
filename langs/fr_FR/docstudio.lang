@@ -170,3 +170,5 @@ DocStudioDeletePageN = Supprimer la page %s
 DocStudioRestorePageN = Garder la page %s
 DocStudioToolCheck = Coche
 DocStudioHintCheck = Cliquez sur une case pour la cocher, cliquez à nouveau sur la coche pour la retirer.
+DocStudioToolCross = Croix
+DocStudioToolDot = Rond plein

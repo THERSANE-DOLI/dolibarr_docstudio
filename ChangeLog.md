@@ -1,5 +1,12 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.9
+
+- NEW: PDF editor, cross and filled circle next to the check :   0.9.0
+  - group Check / Cross / Filled circle in the palette (small triangle, right click or long press), same use:
+    click to put, click again to remove
+  - written as vectors in the PDF like the check
+
 ## 0.8
 
 - NEW: PDF editor, Check tool to tick the boxes of a form :   0.8.0

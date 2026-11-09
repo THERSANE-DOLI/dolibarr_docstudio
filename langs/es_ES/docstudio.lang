@@ -170,3 +170,5 @@ DocStudioDeletePageN = Eliminar la página %s
 DocStudioRestorePageN = Conservar la página %s
 DocStudioToolCheck = Marca
 DocStudioHintCheck = Haga clic en una casilla para marcarla, vuelva a hacer clic en la marca para quitarla.
+DocStudioToolCross = Cruz
+DocStudioToolDot = Círculo relleno
