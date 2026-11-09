@@ -164,3 +164,7 @@ DocStudioHintDraw = Dibuje con el ratón o con el dedo.
 DocStudioHintHighlight = Seleccione texto para resaltarlo, o trace a mano alzada en otro lugar.
 DocStudioHintLine = Arrastre para trazar: horizontal o vertical cuando está cerca, cualquier ángulo con Mayús.
 DocStudioPageDeleted = Página eliminada
+DocStudioRotateLeftN = Girar la página %s a la izquierda
+DocStudioRotateRightN = Girar la página %s a la derecha
+DocStudioDeletePageN = Eliminar la página %s
+DocStudioRestorePageN = Conservar la página %s

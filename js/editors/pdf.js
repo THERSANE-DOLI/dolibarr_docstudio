@@ -153,7 +153,7 @@ window.DocStudio.registerViewer('pdfedit', {
 		 * @param {Uint8Array} bytes
 		 */
 		async function reloadDocument(bytes) {
-			const state = { page: pdfViewer.currentPageNumber, scale: pdfViewer.currentScale };
+			const state = { page: activePage, scale: pdfViewer.currentScale };
 			const old = pdfDocument;
 			pdfViewer.setDocument(null);
 			linkService.setDocument(null, null);
@@ -778,6 +778,7 @@ window.DocStudio.registerViewer('pdfedit', {
 			image.addEventListener('click', function () {
 				if (pageNumber <= pdfViewer.pagesCount) {
 					pdfViewer.currentPageNumber = pageNumber;
+					setActivePage(pageNumber);
 				}
 			});
 			const bar = document.createElement('div');
@@ -825,6 +826,76 @@ window.DocStudio.registerViewer('pdfedit', {
 		/* Rotation: applied at once to the document (visible everywhere), the annotations are kept */
 
 		let busy = false;
+
+		/* Active page: the one the page actions (rotate, delete) apply to. It follows the scroll (page that fills
+		   most of the view), or the page clicked with the Select tool until the scroll changes the page shown. */
+
+		let activePage = 1;
+		let targetShown = false;
+
+		function applyActive() {
+			for (let i = 1; i <= pdfDocument.numPages; i++) {
+				const pageView = pdfViewer.getPageView(i - 1);
+				if (pageView && pageView.div) {
+					pageView.div.classList.toggle('ds-page-active', i === activePage);
+					pageView.div.classList.toggle('ds-page-target', i === activePage && targetShown);
+					let badge = pageView.div.querySelector(':scope > .ds-page-badge');
+					if (i === activePage && targetShown) {
+						if (!badge) {
+							badge = document.createElement('div');
+							badge.className = 'ds-page-badge';
+							pageView.div.appendChild(badge);
+						}
+						badge.textContent = t('DocStudioPage', activePage, pdfDocument.numPages);
+					} else if (badge) {
+						badge.remove();
+					}
+				}
+			}
+			Object.keys(thumbs).forEach(function (key) {
+				thumbs[key].classList.toggle('ds-thumb-active', Number(key) === activePage);
+			});
+			if (pageIndicator) {
+				pageIndicator.textContent = t('DocStudioPage', activePage, pdfDocument.numPages);
+			}
+			if (typeof syncDeleteButton === 'function') {
+				syncDeleteButton();
+			}
+		}
+
+		/**
+		 * @param {number} pageNumber
+		 */
+		function setActivePage(pageNumber) {
+			activePage = Math.max(1, Math.min(pdfDocument.numPages, pageNumber));
+			applyActive();
+		}
+
+		/**
+		 * @param {boolean} shown Show which page the action will change
+		 */
+		function showTarget(shown) {
+			targetShown = shown;
+			applyActive();
+		}
+
+		eventBus.on('pagechanging', function (e) {
+			setActivePage(e.pageNumber);
+		});
+		eventBus.on('pagerendered', function () {
+			applyActive();
+		});
+		// Click on a page with the Select tool: this page becomes the active one
+		viewerContainer.addEventListener('click', function (e) {
+			if (tool !== TOOL_NONE) {
+				return;
+			}
+			const pageDiv = e.target.closest('.page[data-page-number]');
+			if (pageDiv) {
+				setActivePage(Number(pageDiv.dataset.pageNumber));
+			}
+		});
+		let pageIndicator = null;
 		let syncDeleteButton = null;
 		let lastAnnotated = null;
 
@@ -836,7 +907,7 @@ window.DocStudio.registerViewer('pdfedit', {
 				return;
 			}
 			busy = true;
-			const pageNumber = pdfViewer.currentPageNumber;
+			const pageNumber = activePage;
 			try {
 				const bytes = await pdfDocument.saveDocument();
 				const doc = await PDFLib.PDFDocument.load(bytes, { updateMetadata: false });
@@ -1029,28 +1100,48 @@ window.DocStudio.registerViewer('pdfedit', {
 		const paletteSeparator = document.createElement('span');
 		paletteSeparator.className = 'ds-palette-separator';
 		palette.appendChild(paletteSeparator);
-		actionButton('rotate-left', t('DocStudioRotateLeft'), function () {
+		const rotateLeftButton = actionButton('rotate-left', t('DocStudioRotateLeft'), function () {
 			rotateCurrentPage(-90);
 		});
-		actionButton('rotate-right', t('DocStudioRotateRight'), function () {
+		const rotateRightButton = actionButton('rotate-right', t('DocStudioRotateRight'), function () {
 			rotateCurrentPage(90);
 		});
 		const deleteButton = actionButton('delete', t('DocStudioDeletePage'), function () {
-			toggleDeleted(pdfViewer.currentPageNumber);
+			toggleDeleted(activePage);
 		});
-		// The delete button shows whether the page on screen is deleted
+		// Buttons acting on the active page: their tooltips name it, and the page is shown when the mouse is on them
 		syncDeleteButton = function () {
-			const isDeleted = deleted.has(pdfViewer.currentPageNumber);
+			const isDeleted = deleted.has(activePage);
 			deleteButton.classList.toggle('docstudio-active', isDeleted);
 			deleteButton.setAttribute('aria-pressed', isDeleted ? 'true' : 'false');
-			deleteButton.title = isDeleted ? t('DocStudioRestorePage') : t('DocStudioDeletePage');
+			deleteButton.title = isDeleted ? t('DocStudioRestorePageN', activePage) : t('DocStudioDeletePageN', activePage);
+			rotateLeftButton.title = t('DocStudioRotateLeftN', activePage);
+			rotateRightButton.title = t('DocStudioRotateRightN', activePage);
+			[rotateLeftButton, rotateRightButton, deleteButton].forEach(function (btn) {
+				btn.setAttribute('aria-label', btn.title);
+			});
 		};
-		eventBus.on('pagechanging', syncDeleteButton);
+		[rotateLeftButton, rotateRightButton, deleteButton].forEach(function (btn) {
+			btn.addEventListener('mouseenter', function () {
+				showTarget(true);
+			});
+			btn.addEventListener('mouseleave', function () {
+				showTarget(false);
+			});
+			btn.addEventListener('focus', function () {
+				showTarget(true);
+			});
+			btn.addEventListener('blur', function () {
+				showTarget(false);
+			});
+		});
 
 		/* Options of the tool (top bar) */
 
 		const toolName = document.createElement('span');
 		toolName.className = 'ds-toolname';
+		pageIndicator = document.createElement('span');
+		pageIndicator.className = 'ds-page-indicator';
 
 		/**
 		 * @param {string} text
@@ -1244,12 +1335,13 @@ window.DocStudio.registerViewer('pdfedit', {
 			}
 		});
 
-		ctx.toolbar.append(toolName, fontLabel, boldLabel, sizeLabel, colorLabel, cropAllLabel, imageButton, undoZone, hint);
+		ctx.toolbar.append(pageIndicator, toolName, fontLabel, boldLabel, sizeLabel, colorLabel, cropAllLabel, imageButton, undoZone, hint);
 		syncBold();
 
 		setDocument(pdfDocument);
 		drawThumbs(order.slice());
 		selectTool(TOOL_NONE);
+		applyActive();
 
 		/* Build the new PDF */
 

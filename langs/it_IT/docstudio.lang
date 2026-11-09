@@ -164,3 +164,7 @@ DocStudioHintDraw = Disegnate con il mouse o con il dito.
 DocStudioHintHighlight = Selezionate del testo per evidenziarlo, o disegnate a mano libera altrove.
 DocStudioHintLine = Trascinate per tracciare: orizzontale o verticale quando vi è vicino, qualsiasi angolo con Maiusc.
 DocStudioPageDeleted = Pagina eliminata
+DocStudioRotateLeftN = Ruota la pagina %s a sinistra
+DocStudioRotateRightN = Ruota la pagina %s a destra
+DocStudioDeletePageN = Elimina la pagina %s
+DocStudioRestorePageN = Mantieni la pagina %s

@@ -1,5 +1,13 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.7
+
+- NEW: PDF editor, active page shown: the page the rotation and the deletion apply to :   0.7.0
+  - outline and shadow on the active page (the one filling the view, or the one clicked with the Select tool),
+    same outline on its thumbnail, « Page 3 / 4 » in the top bar
+  - with the mouse on rotate left, rotate right or delete: page highlighted with a badge « Page 3 / 4 », tooltips
+    naming the page (« Rotate page 3 right »)
+
 ## 0.6
 
 - NEW: PDF editor, split directly between the pages of the document :   0.6.0

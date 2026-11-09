@@ -736,6 +736,46 @@ body {
 	border-top-color: #b42318;
 }
 
+/* Active page: the one the page actions apply to */
+.ds-edit-viewer .pdfViewer .page.ds-page-active {
+	outline: 2px solid var(--ds-accent);
+	outline-offset: -7px;
+	box-shadow: 0 4px 18px rgba(38, 60, 92, 0.25);
+}
+
+.ds-edit-viewer .pdfViewer .page.ds-page-target {
+	outline: 4px solid var(--ds-accent);
+	box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.08), 0 6px 24px rgba(38, 60, 92, 0.35);
+}
+
+.ds-page-badge {
+	position: absolute;
+	top: 14px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 45;
+	padding: 4px 12px;
+	border-radius: 12px;
+	background: var(--ds-accent);
+	color: #ffffff;
+	font-weight: 600;
+	font-size: 13px;
+	pointer-events: none;
+}
+
+.ds-thumb.ds-thumb-active {
+	border-color: var(--ds-accent);
+}
+
+.ds-page-indicator {
+	font-weight: 600;
+	color: var(--ds-accent);
+	white-space: nowrap;
+	padding-right: 8px;
+	margin-right: 4px;
+	border-right: 1px solid var(--ds-border);
+}
+
 /* More space between the pages of the editor, with the scissors in it */
 .ds-edit-viewer .pdfViewer {
 	--page-margin: 1px auto 36px;

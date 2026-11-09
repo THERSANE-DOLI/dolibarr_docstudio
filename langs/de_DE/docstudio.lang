@@ -164,3 +164,7 @@ DocStudioHintDraw = Zeichnen Sie mit der Maus oder dem Finger.
 DocStudioHintHighlight = Wählen Sie Text aus, um ihn zu markieren, oder zeichnen Sie anderswo freihändig.
 DocStudioHintLine = Ziehen Sie zum Zeichnen: waagerecht oder senkrecht, wenn nahe daran, beliebiger Winkel mit Umschalt.
 DocStudioPageDeleted = Seite gelöscht
+DocStudioRotateLeftN = Seite %s nach links drehen
+DocStudioRotateRightN = Seite %s nach rechts drehen
+DocStudioDeletePageN = Seite %s löschen
+DocStudioRestorePageN = Seite %s behalten

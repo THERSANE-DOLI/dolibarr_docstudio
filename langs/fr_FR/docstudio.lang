@@ -164,3 +164,7 @@ DocStudioHintDraw = Dessinez à la souris ou au doigt.
 DocStudioHintHighlight = Sélectionnez du texte pour le surligner, ou tracez à main levée ailleurs.
 DocStudioHintLine = Faites glisser pour tracer : horizontal ou vertical quand il en est proche, n'importe quel angle avec Maj.
 DocStudioPageDeleted = Page supprimée
+DocStudioRotateLeftN = Pivoter la page %s vers la gauche
+DocStudioRotateRightN = Pivoter la page %s vers la droite
+DocStudioDeletePageN = Supprimer la page %s
+DocStudioRestorePageN = Garder la page %s
