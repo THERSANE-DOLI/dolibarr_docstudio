@@ -862,6 +862,21 @@ body {
 	background: rgba(255, 255, 255, 0.85);
 }
 
+.ds-mark {
+	position: absolute;
+	pointer-events: none;
+}
+
+.ds-mark .ds-icon {
+	width: 100%;
+	height: 100%;
+
+}
+
+.ds-zone-layer.ds-zone-active .ds-mark {
+	cursor: pointer;
+}
+
 /* Links of the PDF never active in the editor */
 .ds-edit-viewer .annotationLayer .linkAnnotation,
 .ds-edit-viewer .annotationLayer a {

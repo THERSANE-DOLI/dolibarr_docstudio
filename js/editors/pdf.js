@@ -32,6 +32,8 @@ const TOOL_TEXT = 'text';
 const TOOL_DRAW = 'draw';
 const TOOL_HIGHLIGHT = 'highlight';
 const TOOL_LINE = 'line';
+const TOOL_CHECK = 'check';
+const CHECK_PATH = 'M5 12l5 5l10 -10';
 const TOOL_IMAGE = 'image';
 const TOOL_REDACT = 'redact';
 const TOOL_CROP = 'crop';
@@ -281,7 +283,7 @@ window.DocStudio.registerViewer('pdfedit', {
 				veil.append(stamp, restoreButton);
 				layer.appendChild(veil);
 			}
-			layer.classList.toggle('ds-zone-active', [TOOL_REDACT, TOOL_CROP, TOOL_TEXT, TOOL_LINE].includes(tool));
+			layer.classList.toggle('ds-zone-active', [TOOL_REDACT, TOOL_CROP, TOOL_TEXT, TOOL_LINE, TOOL_CHECK].includes(tool));
 			layer.classList.toggle('ds-text-tool', tool === TOOL_TEXT);
 
 			const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -325,6 +327,18 @@ window.DocStudio.registerViewer('pdfedit', {
 					svg.appendChild(line);
 				} else if (o.kind === 'text') {
 					layer.appendChild(textBox(o, viewport));
+				} else if (o.kind === 'mark') {
+					const c = viewport.convertToViewportPoint(o.x, o.y);
+					const box = o.size * viewport.scale;
+					const mark = document.createElement('div');
+					mark.className = 'ds-mark';
+					mark.style.left = (c[0] - box / 2) + 'px';
+					mark.style.top = (c[1] - box / 2) + 'px';
+					mark.style.width = box + 'px';
+					mark.style.height = box + 'px';
+					mark.style.color = o.color;
+					mark.appendChild(icon('check'));
+					layer.appendChild(mark);
 				}
 			});
 		}
@@ -520,6 +534,26 @@ window.DocStudio.registerViewer('pdfedit', {
 			const x0 = e.clientX - box.left;
 			const y0 = e.clientY - box.top;
 
+			if (tool === TOOL_CHECK) {
+				e.preventDefault();
+				// Click on a check: it is removed (unchecked), elsewhere: a new check centered on the click
+				const hit = objects.find(function (o) {
+					if (o.kind !== 'mark' || o.page !== pageNumber) {
+						return false;
+					}
+					const c = viewport.convertToViewportPoint(o.x, o.y);
+					return Math.abs(c[0] - x0) <= o.size * viewport.scale / 2 && Math.abs(c[1] - y0) <= o.size * viewport.scale / 2;
+				});
+				if (hit) {
+					removeObject(hit);
+					return;
+				}
+				const p = viewport.convertToPdfPoint(x0, y0);
+				objects.push({ id: ++lastId, kind: 'mark', page: pageNumber, x: p[0], y: p[1], size: Number(size.value), color: color.value });
+				setDirty();
+				drawLayer(pageNumber);
+				return;
+			}
 			if (tool === TOOL_TEXT) {
 				e.preventDefault();
 				const p = viewport.convertToPdfPoint(x0, y0 - Number(size.value) * viewport.scale * 0.6);
@@ -954,6 +988,7 @@ window.DocStudio.registerViewer('pdfedit', {
 			{ code: TOOL_HIGHLIGHT, label: t('DocStudioToolHighlight'), icon: 'highlight', key: 'h', mode: E.HIGHLIGHT, group: 'mark' },
 			{ code: TOOL_LINE, label: t('DocStudioHighlightLine'), icon: 'line', key: 'l', mode: E.NONE, group: 'mark' },
 			{ code: TOOL_IMAGE, label: t('DocStudioToolImage'), icon: 'image', key: 'i', mode: E.STAMP },
+			{ code: TOOL_CHECK, label: t('DocStudioToolCheck'), icon: 'check', key: 'k', mode: E.NONE },
 			{ code: TOOL_REDACT, label: t('DocStudioToolRedact'), icon: 'redact', key: 'x', mode: E.NONE },
 			{ code: TOOL_CROP, label: t('DocStudioToolCrop'), icon: 'crop', key: 'c', mode: E.NONE }
 		];
@@ -1201,7 +1236,7 @@ window.DocStudio.registerViewer('pdfedit', {
 		cropAllLabel.append(cropAllBox, document.createTextNode(' ' + t('DocStudioCropAll')));
 		const undoZone = ctx.utils.button(t('DocStudioUndoZone'), t('DocStudioUndoZone'), function () {
 			const last = objects.filter(function (o) {
-				return o.kind === TOOL_REDACT || o.kind === TOOL_CROP || o.kind === 'line';
+				return o.kind === TOOL_REDACT || o.kind === TOOL_CROP || o.kind === 'line' || o.kind === 'mark';
 			}).pop();
 			if (last) {
 				removeObject(last);
@@ -1253,6 +1288,7 @@ window.DocStudio.registerViewer('pdfedit', {
 		hints[TOOL_DRAW] = t('DocStudioHintDraw');
 		hints[TOOL_HIGHLIGHT] = t('DocStudioHintHighlight');
 		hints[TOOL_LINE] = t('DocStudioHintLine');
+		hints[TOOL_CHECK] = t('DocStudioHintCheck');
 
 		function showParams() {
 			const def = toolOf(tool);
@@ -1260,10 +1296,10 @@ window.DocStudio.registerViewer('pdfedit', {
 			toolName.replaceChildren(icon(def.icon), document.createTextNode(' ' + def.label));
 			fontLabel.hidden = !textParams;
 			boldLabel.hidden = !textParams;
-			colorLabel.hidden = !(textParams || [TOOL_DRAW, TOOL_HIGHLIGHT, TOOL_LINE].includes(tool));
-			sizeLabel.hidden = !(textParams || tool === TOOL_DRAW || tool === TOOL_LINE);
+			colorLabel.hidden = !(textParams || [TOOL_DRAW, TOOL_HIGHLIGHT, TOOL_LINE, TOOL_CHECK].includes(tool));
+			sizeLabel.hidden = !(textParams || [TOOL_DRAW, TOOL_LINE, TOOL_CHECK].includes(tool));
 			cropAllLabel.hidden = tool !== TOOL_CROP;
-			undoZone.hidden = ![TOOL_REDACT, TOOL_CROP, TOOL_LINE].includes(tool);
+			undoZone.hidden = ![TOOL_REDACT, TOOL_CROP, TOOL_LINE, TOOL_CHECK].includes(tool);
 			imageButton.hidden = tool !== TOOL_IMAGE;
 			hint.textContent = textParams && tool === TOOL_NONE ? '' : (hints[tool] || '');
 		}
@@ -1310,6 +1346,9 @@ window.DocStudio.registerViewer('pdfedit', {
 				} else if (code === TOOL_TEXT) {
 					color.value = '#1f2328';
 					size.value = '12';
+				} else if (code === TOOL_CHECK) {
+					color.value = '#1f2328';
+					size.value = '14';
 				}
 			}
 			showParams();
@@ -1432,6 +1471,21 @@ window.DocStudio.registerViewer('pdfedit', {
 						opacity: 0.4,
 						lineCap: PDFLib.LineCapStyle.Butt
 					});
+				} else if (o.kind === 'mark') {
+					// Vector check, the same as shown: top left corner of its box, direction of the page as shown
+					const viewport = (await pdfDocument.getPage(o.page)).getViewport({ scale: 1 });
+					const c = viewport.convertToViewportPoint(o.x, o.y);
+					const a = viewport.convertToPdfPoint(c[0] - o.size / 2, c[1] - o.size / 2);
+					const b = viewport.convertToPdfPoint(c[0] - o.size / 2 + 10, c[1] - o.size / 2);
+					page.drawSvgPath(CHECK_PATH, {
+						x: a[0],
+						y: a[1],
+						scale: o.size / 24,
+						rotate: PDFLib.degrees(Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI),
+						borderColor: rgbOf(o.color),
+						borderWidth: 2,
+						borderLineCap: PDFLib.LineCapStyle.Round
+					});
 				} else if (o.kind === 'text' && o.text.trim() !== '') {
 					const pdfFont = await embed(o.font, o.bold);
 					// Direction of the text as shown (rotated pages): from the viewport of the page at scale 1
@@ -1552,7 +1606,7 @@ window.DocStudio.registerViewer('pdfedit', {
 
 			// Texts and straight lines written in the pages first (so a redaction covers them too)
 			if (objects.some(function (o) {
-				return o.kind === 'text' || o.kind === 'line';
+				return o.kind === 'text' || o.kind === 'line' || o.kind === 'mark';
 			})) {
 				await writeObjects(src);
 			}

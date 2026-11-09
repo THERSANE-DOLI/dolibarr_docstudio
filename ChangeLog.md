@@ -1,5 +1,12 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.8
+
+- NEW: PDF editor, Check tool to tick the boxes of a form :   0.8.0
+  - click on a box: a check centered on it, click on the check again: removed (shortcut K)
+  - size and color in the options, « Remove the last element » for the checks too
+  - written as vector paths in the PDF (sharp when printed), also on rotated pages
+
 ## 0.7
 
 - FIX: PDF editor, shadow of the page flashing when the mouse is on the page actions, grey frame around the pages :   0.7.2

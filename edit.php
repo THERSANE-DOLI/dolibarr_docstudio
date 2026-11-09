@@ -216,7 +216,7 @@ if ($provider !== null && count($viewers)) {
 			'DocStudioHighlightLine', 'DocStudioFontCharsetError', 'DocStudioTextPlaceholder', 'DocStudioMove',
 			'DocStudioTools', 'DocStudioMoreTools', 'DocStudioChooseImage', 'DocStudioHintSelect', 'DocStudioHintText', 'DocStudioHintDraw',
 			'DocStudioHintHighlight', 'DocStudioHintLine', 'DocStudioPageDeleted', 'DocStudioRotateLeftN',
-			'DocStudioRotateRightN', 'DocStudioDeletePageN', 'DocStudioRestorePageN',
+			'DocStudioRotateRightN', 'DocStudioDeletePageN', 'DocStudioRestorePageN', 'DocStudioToolCheck', 'DocStudioHintCheck',
 		)),
 	);
 	docstudioPrintJsonData('docstudio-config', $config);
