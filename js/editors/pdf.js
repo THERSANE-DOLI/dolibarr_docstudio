@@ -16,19 +16,27 @@
 
 /**
  * PDF editor (no server needed):
- * - annotations with the editors of pdf.js: text, drawing, highlight, image;
- * - pages: rotate, delete, reorder (panel of the pages, drag and drop);
+ * - texts of DocStudio: movable, editable until saving, font (standard fonts of PDF or fonts uploaded in the setup),
+ *   size, color, bold; written in the pages when saving;
+ * - drawing, highlight (on the text, free hand or straight line) and images: editors of pdf.js and straight lines of
+ *   DocStudio;
+ * - pages: rotate (applied at once), delete, reorder (panel of the pages), split into several files;
  * - crop: visible area of a page (or of every page); the content outside stays in the file;
  * - redaction: every page with a redacted zone is replaced by an image of the page with the zones painted black,
  *   then the result is checked (the text under the zones must be nowhere in the new file).
- * Saving: annotations written by pdf.js, then pages, crop and redaction with pdf-lib, then DocStudio.saveContent().
- * Safety of the display: eval disabled, no XFA, no script, links of the PDF inactive.
+ * Safety of the display: eval disabled, no XFA, no script, links of the PDF inactive. Texts are plain text only.
  */
 
 const TOOL_NONE = 'none';
+const TOOL_TEXT = 'text';
+const TOOL_DRAW = 'draw';
+const TOOL_HIGHLIGHT = 'highlight';
+const TOOL_IMAGE = 'image';
 const TOOL_REDACT = 'redact';
 const TOOL_CROP = 'crop';
 const REDACT_DPI = 200;
+const LINE_HEIGHT = 1.2;
+const ASCENT = 0.8;
 
 window.DocStudio.registerViewer('pdfedit', {
 	async mount(ctx) {
@@ -39,6 +47,8 @@ window.DocStudio.registerViewer('pdfedit', {
 		// The components of the viewer of pdf.js read the library from here
 		globalThis.pdfjsLib = pdfjsLib;
 		const pdfjsViewer = await import(conf.viewer);
+		const PDFLib = await import(ctx.config.pdflib);
+		const fonts = ctx.config.fonts || [];
 
 		const docOptions = {
 			isEvalSupported: false,
@@ -60,22 +70,25 @@ window.DocStudio.registerViewer('pdfedit', {
 			}
 			updatePassword(password);
 		};
-		const pdfDocument = await loadingTask.promise;
+		let pdfDocument = await loadingTask.promise;
 		const pageCount = pdfDocument.numPages;
 
 		/* State */
 
 		let dirty = false;
 		let tool = TOOL_NONE;
-		const zones = [];				// {id, page (1-based), kind: 'redact'|'crop', rect: [x1, y1, x2, y2] in PDF units}
+		let highlightStraight = false;
+		// Objects of DocStudio on the pages, positions in PDF units:
+		// redact / crop {rect}, line {p0, p1, color, width}, text {x, y, text, font, size, color, bold}
+		const objects = [];
 		const order = [];				// original page numbers in the new order
-		const rotation = {};			// page => added rotation (0, 90, 180, 270)
 		const deleted = new Set();		// deleted page numbers
+		const cuts = new Set();			// page numbers after which the PDF is split
 		let cropAll = false;
-		let zoneId = 0;
+		let lastId = 0;
+		let selectedText = null;
 		for (let i = 1; i <= pageCount; i++) {
 			order.push(i);
-			rotation[i] = 0;
 		}
 
 		/* Layout */
@@ -111,14 +124,26 @@ window.DocStudio.registerViewer('pdfedit', {
 			enableHighlightFloatingButton: false
 		});
 		linkService.setViewer(pdfViewer);
-		pdfViewer.setDocument(pdfDocument);
-		linkService.setDocument(pdfDocument, null);
+		let restore = null;
 		eventBus.on('pagesinit', function () {
+			if (restore) {
+				pdfViewer.currentScale = restore.scale;
+				pdfViewer.currentPageNumber = restore.page;
+				restore = null;
+				return;
+			}
 			pdfViewer.currentScaleValue = 'page-width';
 			if (pdfViewer.currentScale > 1.25) {
 				pdfViewer.currentScale = 1.25;
 			}
 		});
+
+		function setDocument(doc) {
+			pdfDocument = doc;
+			pdfDocument.annotationStorage.onSetModified = setDirty;
+			pdfViewer.setDocument(doc);
+			linkService.setDocument(doc, null);
+		}
 
 		function setDirty() {
 			if (!dirty) {
@@ -126,15 +151,59 @@ window.DocStudio.registerViewer('pdfedit', {
 				saveButton.disabled = false;
 			}
 		}
-		pdfDocument.annotationStorage.onSetModified = setDirty;
 
-		/* Zones (redaction, crop) drawn over the pages */
+		// Ctrl + wheel zooms the PDF only, not the whole page
+		viewerContainer.addEventListener('wheel', function (e) {
+			if (!e.ctrlKey && !e.metaKey) {
+				return;
+			}
+			e.preventDefault();
+			const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+			pdfViewer.currentScale = Math.min(5, Math.max(0.25, pdfViewer.currentScale * factor));
+		}, { passive: false });
+
+		/* Fonts */
+
+		const fontFaces = {};
+
+		/**
+		 * @param {string} key
+		 * @returns {Object} font of the list (the first one when unknown)
+		 */
+		function fontOf(key) {
+			return fonts.find(function (f) {
+				return f.key === key;
+			}) || fonts[0];
+		}
+
+		/**
+		 * Load an uploaded font for the display (FontFace from its file, no CSS needed)
+		 * @param {Object} font
+		 */
+		async function loadFontFace(font) {
+			if (!font.url || fontFaces[font.key]) {
+				return;
+			}
+			fontFaces[font.key] = true;
+			try {
+				const regular = new FontFace(font.family, await (await fetch(font.url, { credentials: 'same-origin' })).arrayBuffer(), { weight: '400' });
+				document.fonts.add(await regular.load());
+				if (font.urlBold) {
+					const bold = new FontFace(font.family, await (await fetch(font.urlBold, { credentials: 'same-origin' })).arrayBuffer(), { weight: '700' });
+					document.fonts.add(await bold.load());
+				}
+			} catch (e) {
+				console.error(e);
+			}
+		}
+
+		/* Layer of DocStudio over each page (zones, lines, texts) */
 
 		/**
 		 * @param {number} pageNumber
-		 * @returns {HTMLElement|null} layer of the zones of a page, created when needed
+		 * @returns {HTMLElement|null}
 		 */
-		function zoneLayer(pageNumber) {
+		function layerOf(pageNumber) {
 			const pageView = pdfViewer.getPageView(pageNumber - 1);
 			if (!pageView || !pageView.div) {
 				return null;
@@ -145,89 +214,307 @@ window.DocStudio.registerViewer('pdfedit', {
 				layer.className = 'ds-zone-layer';
 				layer.dataset.page = String(pageNumber);
 				pageView.div.appendChild(layer);
-				layer.addEventListener('pointerdown', startDrawing);
+				layer.addEventListener('pointerdown', onLayerPointerDown);
 			}
 			return layer;
 		}
 
-		function drawZones(pageNumber) {
-			const layer = zoneLayer(pageNumber);
+		/** @returns {Object|null} last crop zone */
+		function lastCrop() {
+			const crops = objects.filter(function (o) {
+				return o.kind === 'crop';
+			});
+			return crops.length ? crops[crops.length - 1] : null;
+		}
+
+		/**
+		 * Draw the objects of a page
+		 * @param {number} pageNumber
+		 */
+		function drawLayer(pageNumber) {
+			const layer = layerOf(pageNumber);
 			if (!layer) {
 				return;
 			}
 			const viewport = pdfViewer.getPageView(pageNumber - 1).viewport;
+			const editing = layer.querySelector('.ds-text-content:focus');
+			if (editing) {
+				// Never redraw the text being typed
+				return;
+			}
 			layer.replaceChildren();
-			layer.classList.toggle('ds-zone-active', tool === TOOL_REDACT || tool === TOOL_CROP);
-			zones.filter(function (z) {
-				return z.page === pageNumber || (z.kind === 'crop' && cropAll && z.id === lastCropId());
-			}).forEach(function (z) {
-				const r = viewport.convertToViewportRectangle(z.rect);
-				const el = document.createElement('div');
-				el.className = 'ds-zone ds-zone-' + z.kind;
-				el.style.left = Math.min(r[0], r[2]) + 'px';
-				el.style.top = Math.min(r[1], r[3]) + 'px';
-				el.style.width = Math.abs(r[2] - r[0]) + 'px';
-				el.style.height = Math.abs(r[3] - r[1]) + 'px';
-				const remove = document.createElement('button');
-				remove.type = 'button';
-				remove.className = 'ds-zone-remove';
-				remove.textContent = '×';
-				remove.title = t('DocStudioRemoveZone');
-				remove.addEventListener('pointerdown', function (e) {
-					e.stopPropagation();
-				});
-				remove.addEventListener('click', function (e) {
-					e.stopPropagation();
-					removeZone(z.id);
-				});
-				el.appendChild(remove);
-				layer.appendChild(el);
+			layer.classList.toggle('ds-zone-active', [TOOL_REDACT, TOOL_CROP, TOOL_TEXT].includes(tool) || (tool === TOOL_HIGHLIGHT && highlightStraight));
+			layer.classList.toggle('ds-text-tool', tool === TOOL_TEXT);
+
+			const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+			svg.setAttribute('class', 'ds-lines');
+			svg.setAttribute('width', String(viewport.width));
+			svg.setAttribute('height', String(viewport.height));
+			layer.appendChild(svg);
+
+			const crop = lastCrop();
+			objects.forEach(function (o) {
+				if (o.page !== pageNumber && !(o.kind === 'crop' && cropAll && o === crop)) {
+					return;
+				}
+				if (o.kind === 'redact' || o.kind === 'crop') {
+					const r = viewport.convertToViewportRectangle(o.rect);
+					const el = document.createElement('div');
+					el.className = 'ds-zone ds-zone-' + o.kind;
+					el.style.left = Math.min(r[0], r[2]) + 'px';
+					el.style.top = Math.min(r[1], r[3]) + 'px';
+					el.style.width = Math.abs(r[2] - r[0]) + 'px';
+					el.style.height = Math.abs(r[3] - r[1]) + 'px';
+					el.appendChild(removeButton(o));
+					layer.appendChild(el);
+				} else if (o.kind === 'line') {
+					const a = viewport.convertToViewportPoint(o.p0[0], o.p0[1]);
+					const b = viewport.convertToViewportPoint(o.p1[0], o.p1[1]);
+					const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+					line.setAttribute('x1', String(a[0]));
+					line.setAttribute('y1', String(a[1]));
+					line.setAttribute('x2', String(b[0]));
+					line.setAttribute('y2', String(b[1]));
+					line.setAttribute('stroke', o.color);
+					line.setAttribute('stroke-width', String(o.width * viewport.scale));
+					line.setAttribute('stroke-opacity', '0.4');
+					line.setAttribute('class', 'ds-line');
+					line.addEventListener('click', function () {
+						if (window.confirm(t('DocStudioRemoveZone') + ' ?')) {
+							removeObject(o);
+						}
+					});
+					svg.appendChild(line);
+				} else if (o.kind === 'text') {
+					layer.appendChild(textBox(o, viewport));
+				}
 			});
 		}
 
-		function redrawAllZones() {
-			for (let i = 1; i <= pageCount; i++) {
-				drawZones(i);
+		/**
+		 * @param {Object} o
+		 * @returns {HTMLButtonElement}
+		 */
+		function removeButton(o) {
+			const remove = document.createElement('button');
+			remove.type = 'button';
+			remove.className = 'ds-zone-remove';
+			remove.textContent = '×';
+			remove.title = t('DocStudioRemoveZone');
+			remove.addEventListener('pointerdown', function (e) {
+				e.stopPropagation();
+			});
+			remove.addEventListener('click', function (e) {
+				e.stopPropagation();
+				removeObject(o);
+			});
+			return remove;
+		}
+
+		function redrawAll() {
+			for (let i = 1; i <= pdfDocument.numPages; i++) {
+				drawLayer(i);
 			}
 			updateNotice();
 		}
 
-		/** @returns {number} id of the last crop zone drawn, -1 if none */
-		function lastCropId() {
-			const crops = zones.filter(function (z) {
-				return z.kind === 'crop';
-			});
-			return crops.length ? crops[crops.length - 1].id : -1;
+		/**
+		 * @param {Object} o
+		 */
+		function removeObject(o) {
+			const index = objects.indexOf(o);
+			if (index >= 0) {
+				objects.splice(index, 1);
+				if (selectedText === o) {
+					selectedText = null;
+				}
+				setDirty();
+				drawLayer(o.page);
+				if (o.kind === 'crop') {
+					redrawAll();
+				}
+				updateNotice();
+			}
 		}
 
-		function removeZone(id) {
-			const index = zones.findIndex(function (z) {
-				return z.id === id;
+		eventBus.on('pagerendered', function (e) {
+			drawLayer(e.pageNumber);
+		});
+
+		/* Texts of DocStudio */
+
+		/**
+		 * Box of a text: plain text only (never HTML), moved by its handle
+		 * @param {Object} o
+		 * @param {Object} viewport
+		 * @returns {HTMLElement}
+		 */
+		function textBox(o, viewport) {
+			const font = fontOf(o.font);
+			loadFontFace(font);
+			const p = viewport.convertToViewportPoint(o.x, o.y);
+			const box = document.createElement('div');
+			box.className = 'ds-text' + (selectedText === o ? ' ds-text-selected' : '');
+			box.style.left = p[0] + 'px';
+			box.style.top = p[1] + 'px';
+			const content = document.createElement('div');
+			content.className = 'ds-text-content';
+			content.setAttribute('contenteditable', 'plaintext-only');
+			content.spellcheck = true;
+			content.textContent = o.text;
+			content.dataset.placeholder = t('DocStudioTextPlaceholder');
+			content.style.fontFamily = font.css;
+			content.style.fontWeight = o.bold ? '700' : '400';
+			content.style.fontSize = (o.size * viewport.scale) + 'px';
+			content.style.lineHeight = String(LINE_HEIGHT);
+			content.style.color = o.color;
+			content.addEventListener('focus', function () {
+				selectText(o, box);
 			});
-			if (index >= 0) {
-				zones.splice(index, 1);
+			content.addEventListener('input', function () {
+				o.text = content.innerText.replace(/\n$/, '');
 				setDirty();
-				redrawAllZones();
-			}
+			});
+			content.addEventListener('paste', function (e) {
+				// Plain text only
+				e.preventDefault();
+				const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+				document.execCommand('insertText', false, text);
+			});
+			content.addEventListener('blur', function () {
+				if (o.text.trim() === '') {
+					window.setTimeout(function () {
+						removeObject(o);
+					}, 0);
+				}
+			});
+			content.addEventListener('pointerdown', function (e) {
+				e.stopPropagation();
+			});
+
+			const handle = document.createElement('span');
+			handle.className = 'ds-text-move';
+			handle.textContent = '✥';
+			handle.title = t('DocStudioMove');
+			handle.addEventListener('pointerdown', function (e) {
+				e.preventDefault();
+				e.stopPropagation();
+				selectText(o, box);
+				const layer = box.parentElement;
+				const start = { x: e.clientX, y: e.clientY, left: parseFloat(box.style.left), top: parseFloat(box.style.top) };
+				handle.setPointerCapture(e.pointerId);
+				function move(ev) {
+					box.style.left = (start.left + ev.clientX - start.x) + 'px';
+					box.style.top = (start.top + ev.clientY - start.y) + 'px';
+				}
+				function end() {
+					handle.removeEventListener('pointermove', move);
+					handle.removeEventListener('pointerup', end);
+					const pdf = viewport.convertToPdfPoint(parseFloat(box.style.left), parseFloat(box.style.top));
+					o.x = pdf[0];
+					o.y = pdf[1];
+					setDirty();
+					if (layer) {
+						drawLayer(o.page);
+					}
+				}
+				handle.addEventListener('pointermove', move);
+				handle.addEventListener('pointerup', end);
+			});
+
+			box.append(handle, content, removeButton(o));
+			return box;
 		}
 
 		/**
-		 * Draw a zone with the pointer on a page
-		 * @param {PointerEvent} e
+		 * @param {Object} o Text selected
+		 * @param {HTMLElement} box
 		 */
-		function startDrawing(e) {
-			if ((tool !== TOOL_REDACT && tool !== TOOL_CROP) || e.button !== 0) {
+		function selectText(o, box) {
+			selectedText = o;
+			document.querySelectorAll('.ds-text-selected').forEach(function (el) {
+				el.classList.remove('ds-text-selected');
+			});
+			box.classList.add('ds-text-selected');
+			fontSelect.value = o.font;
+			size.value = String(o.size);
+			color.value = o.color;
+			boldBox.checked = o.bold;
+			showParams();
+		}
+
+		/** Apply the controls of the toolbar to the selected text */
+		function applyToSelectedText() {
+			if (!selectedText) {
 				return;
 			}
-			e.preventDefault();
+			selectedText.font = fontSelect.value;
+			selectedText.size = Number(size.value);
+			selectedText.color = color.value;
+			selectedText.bold = boldBox.checked && !boldBox.disabled;
+			setDirty();
+			const layer = layerOf(selectedText.page);
+			const content = layer ? layer.querySelector('.ds-text-selected .ds-text-content') : null;
+			if (content) {
+				const font = fontOf(selectedText.font);
+				loadFontFace(font);
+				content.style.fontFamily = font.css;
+				content.style.fontWeight = selectedText.bold ? '700' : '400';
+				content.style.fontSize = (selectedText.size * pdfViewer.getPageView(selectedText.page - 1).viewport.scale) + 'px';
+				content.style.color = selectedText.color;
+			}
+		}
+
+		/* Drawing with the pointer: zones, straight lines, new texts */
+
+		/**
+		 * @param {PointerEvent} e
+		 */
+		function onLayerPointerDown(e) {
+			if (e.button !== 0) {
+				return;
+			}
 			const layer = e.currentTarget;
 			const pageNumber = Number(layer.dataset.page);
+			const viewport = pdfViewer.getPageView(pageNumber - 1).viewport;
 			const box = layer.getBoundingClientRect();
 			const x0 = e.clientX - box.left;
 			const y0 = e.clientY - box.top;
-			const ghost = document.createElement('div');
-			ghost.className = 'ds-zone ds-zone-' + tool + ' ds-zone-ghost';
-			layer.appendChild(ghost);
+
+			if (tool === TOOL_TEXT) {
+				e.preventDefault();
+				const p = viewport.convertToPdfPoint(x0, y0 - Number(size.value) * viewport.scale * 0.6);
+				const o = { id: ++lastId, kind: 'text', page: pageNumber, x: p[0], y: p[1], text: '', font: fontSelect.value, size: Number(size.value), color: color.value, bold: boldBox.checked && !boldBox.disabled };
+				objects.push(o);
+				selectedText = o;
+				drawLayer(pageNumber);
+				const content = layer.querySelector('.ds-text-selected .ds-text-content');
+				if (content) {
+					content.focus();
+				}
+				return;
+			}
+			const kind = (tool === TOOL_HIGHLIGHT && highlightStraight) ? 'line' : tool;
+			if (kind !== TOOL_REDACT && kind !== TOOL_CROP && kind !== 'line') {
+				return;
+			}
+			e.preventDefault();
+			let ghost;
+			if (kind === 'line') {
+				ghost = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+				ghost.setAttribute('stroke', color.value);
+				ghost.setAttribute('stroke-width', String(Number(size.value) * viewport.scale));
+				ghost.setAttribute('stroke-opacity', '0.4');
+				ghost.setAttribute('x1', String(x0));
+				ghost.setAttribute('y1', String(y0));
+				ghost.setAttribute('x2', String(x0));
+				ghost.setAttribute('y2', String(y0));
+				layer.querySelector('svg.ds-lines').appendChild(ghost);
+			} else {
+				ghost = document.createElement('div');
+				ghost.className = 'ds-zone ds-zone-' + kind + ' ds-zone-ghost';
+				layer.appendChild(ghost);
+			}
 			layer.setPointerCapture(e.pointerId);
 			let x1 = x0;
 			let y1 = y0;
@@ -235,6 +522,19 @@ window.DocStudio.registerViewer('pdfedit', {
 			function move(ev) {
 				x1 = Math.max(0, Math.min(box.width, ev.clientX - box.left));
 				y1 = Math.max(0, Math.min(box.height, ev.clientY - box.top));
+				if (kind === 'line') {
+					// Straight: horizontal (or vertical) when close to it, any angle with Shift
+					if (!ev.shiftKey) {
+						if (Math.abs(y1 - y0) < Math.abs(x1 - x0) * 0.15) {
+							y1 = y0;
+						} else if (Math.abs(x1 - x0) < Math.abs(y1 - y0) * 0.15) {
+							x1 = x0;
+						}
+					}
+					ghost.setAttribute('x2', String(x1));
+					ghost.setAttribute('y2', String(y1));
+					return;
+				}
 				ghost.style.left = Math.min(x0, x1) + 'px';
 				ghost.style.top = Math.min(y0, y1) + 'px';
 				ghost.style.width = Math.abs(x1 - x0) + 'px';
@@ -246,24 +546,34 @@ window.DocStudio.registerViewer('pdfedit', {
 				layer.removeEventListener('pointerup', end);
 				layer.removeEventListener('pointercancel', end);
 				ghost.remove();
-				if (Math.abs(x1 - x0) < 4 || Math.abs(y1 - y0) < 4) {
+				if (Math.abs(x1 - x0) < 4 && Math.abs(y1 - y0) < 4) {
 					return;
 				}
-				const viewport = pdfViewer.getPageView(pageNumber - 1).viewport;
-				const p0 = viewport.convertToPdfPoint(Math.min(x0, x1), Math.min(y0, y1));
-				const p1 = viewport.convertToPdfPoint(Math.max(x0, x1), Math.max(y0, y1));
-				const rect = [Math.min(p0[0], p1[0]), Math.min(p0[1], p1[1]), Math.max(p0[0], p1[0]), Math.max(p0[1], p1[1])];
-				if (tool === TOOL_CROP) {
-					// One crop per page
-					for (let i = zones.length - 1; i >= 0; i--) {
-						if (zones[i].kind === 'crop' && zones[i].page === pageNumber) {
-							zones.splice(i, 1);
+				if (kind === 'line') {
+					objects.push({ id: ++lastId, kind: 'line', page: pageNumber, p0: viewport.convertToPdfPoint(x0, y0), p1: viewport.convertToPdfPoint(x1, y1), color: color.value, width: Number(size.value) });
+				} else {
+					if (Math.abs(x1 - x0) < 4 || Math.abs(y1 - y0) < 4) {
+						return;
+					}
+					const p0 = viewport.convertToPdfPoint(Math.min(x0, x1), Math.min(y0, y1));
+					const p1 = viewport.convertToPdfPoint(Math.max(x0, x1), Math.max(y0, y1));
+					const rect = [Math.min(p0[0], p1[0]), Math.min(p0[1], p1[1]), Math.max(p0[0], p1[0]), Math.max(p0[1], p1[1])];
+					if (kind === TOOL_CROP) {
+						for (let i = objects.length - 1; i >= 0; i--) {
+							if (objects[i].kind === 'crop' && objects[i].page === pageNumber) {
+								objects.splice(i, 1);
+							}
 						}
 					}
+					objects.push({ id: ++lastId, kind: kind, page: pageNumber, rect: rect });
 				}
-				zones.push({ id: ++zoneId, page: pageNumber, kind: tool, rect: rect });
 				setDirty();
-				redrawAllZones();
+				if (kind === TOOL_CROP) {
+					redrawAll();
+				} else {
+					drawLayer(pageNumber);
+					updateNotice();
+				}
 			}
 
 			layer.addEventListener('pointermove', move);
@@ -271,19 +581,15 @@ window.DocStudio.registerViewer('pdfedit', {
 			layer.addEventListener('pointercancel', end);
 		}
 
-		eventBus.on('pagerendered', function (e) {
-			drawZones(e.pageNumber);
-		});
-
 		function updateNotice() {
 			const texts = [];
-			if (tool === TOOL_REDACT || zones.some(function (z) {
-				return z.kind === 'redact';
+			if (tool === TOOL_REDACT || objects.some(function (o) {
+				return o.kind === 'redact';
 			})) {
 				texts.push(t('DocStudioRedactHelp'));
 			}
-			if (tool === TOOL_CROP || zones.some(function (z) {
-				return z.kind === 'crop';
+			if (tool === TOOL_CROP || objects.some(function (o) {
+				return o.kind === 'crop';
 			})) {
 				texts.push(t('DocStudioCropHelp'));
 			}
@@ -291,7 +597,17 @@ window.DocStudio.registerViewer('pdfedit', {
 			notice.textContent = texts.join(' ');
 		}
 
-		/* Pages panel: thumbnails, rotate, delete, drag and drop to reorder */
+		document.addEventListener('keydown', onKey);
+		function onKey(e) {
+			// Delete removes the selected text when it is not being typed
+			if ((e.key === 'Delete' || e.key === 'Backspace') && selectedText && !(document.activeElement && document.activeElement.isContentEditable)
+				&& !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement ? document.activeElement.tagName : '')) {
+				e.preventDefault();
+				removeObject(selectedText);
+			}
+		}
+
+		/* Pages panel: thumbnails, delete, drag and drop to reorder, split marks */
 
 		const thumbs = {};
 		let dragged = null;
@@ -299,7 +615,7 @@ window.DocStudio.registerViewer('pdfedit', {
 		async function drawThumb(pageNumber) {
 			const page = await pdfDocument.getPage(pageNumber);
 			const base = page.getViewport({ scale: 1 });
-			const viewport = page.getViewport({ scale: 120 / base.width });
+			const viewport = page.getViewport({ scale: 120 / Math.max(base.width, base.height * 0.75) });
 			const canvas = document.createElement('canvas');
 			canvas.width = Math.floor(viewport.width);
 			canvas.height = Math.floor(viewport.height);
@@ -307,12 +623,22 @@ window.DocStudio.registerViewer('pdfedit', {
 			thumbs[pageNumber].querySelector('.ds-thumb-image').replaceChildren(canvas);
 		}
 
+		async function drawThumbs(list) {
+			for (const pageNumber of list) {
+				try {
+					await drawThumb(pageNumber);
+				} catch (e) {
+					// Thumbnail not drawn, the number stays
+				}
+			}
+		}
+
 		function refreshThumb(pageNumber) {
 			const el = thumbs[pageNumber];
 			el.classList.toggle('ds-thumb-deleted', deleted.has(pageNumber));
-			el.querySelector('.ds-thumb-image').style.transform = 'rotate(' + rotation[pageNumber] + 'deg)';
-			el.querySelector('.ds-thumb-delete').textContent = deleted.has(pageNumber) ? '↺' : '\u{1F5D1}';
-			el.querySelector('.ds-thumb-delete').title = deleted.has(pageNumber) ? t('DocStudioRestorePage') : t('DocStudioDeletePage');
+			const del = el.querySelector('.ds-thumb-delete');
+			del.textContent = deleted.has(pageNumber) ? '↺' : '\u{1F5D1}';
+			del.title = deleted.has(pageNumber) ? t('DocStudioRestorePage') : t('DocStudioDeletePage');
 		}
 
 		function renderPanel() {
@@ -321,9 +647,33 @@ window.DocStudio.registerViewer('pdfedit', {
 			title.className = 'ds-pages-title';
 			title.textContent = t('DocStudioPages');
 			pagesPanel.appendChild(title);
-			order.forEach(function (pageNumber) {
+			order.forEach(function (pageNumber, index) {
 				pagesPanel.appendChild(thumbs[pageNumber]);
+				if (index < order.length - 1) {
+					const cut = document.createElement('button');
+					cut.type = 'button';
+					cut.className = 'ds-cut' + (cuts.has(pageNumber) ? ' ds-cut-active' : '');
+					cut.textContent = '✂';
+					cut.title = cuts.has(pageNumber) ? t('DocStudioSplitRemove') : t('DocStudioSplitHere');
+					cut.addEventListener('click', function () {
+						toggleCut(pageNumber);
+					});
+					pagesPanel.appendChild(cut);
+				}
 			});
+		}
+
+		/**
+		 * @param {number} pageNumber Page after which the PDF is split
+		 */
+		function toggleCut(pageNumber) {
+			if (cuts.has(pageNumber)) {
+				cuts.delete(pageNumber);
+			} else {
+				cuts.add(pageNumber);
+			}
+			setDirty();
+			renderPanel();
 		}
 
 		for (let i = 1; i <= pageCount; i++) {
@@ -343,11 +693,6 @@ window.DocStudio.registerViewer('pdfedit', {
 			bar.className = 'ds-thumb-bar';
 			const label = document.createElement('span');
 			label.textContent = String(pageNumber);
-			const rotate = ctx.utils.button('↻', t('DocStudioRotate'), function () {
-				rotation[pageNumber] = (rotation[pageNumber] + 90) % 360;
-				setDirty();
-				refreshThumb(pageNumber);
-			});
 			const del = ctx.utils.button('', t('DocStudioDeletePage'), function () {
 				if (deleted.has(pageNumber)) {
 					deleted.delete(pageNumber);
@@ -358,7 +703,7 @@ window.DocStudio.registerViewer('pdfedit', {
 				refreshThumb(pageNumber);
 			});
 			del.classList.add('ds-thumb-delete');
-			bar.append(label, rotate, del);
+			bar.append(label, del);
 			el.append(image, bar);
 			el.addEventListener('dragstart', function (e) {
 				dragged = pageNumber;
@@ -380,10 +725,9 @@ window.DocStudio.registerViewer('pdfedit', {
 				if (dragged === null || dragged === pageNumber) {
 					return;
 				}
-				const from = order.indexOf(dragged);
-				order.splice(from, 1);
-				const box = el.getBoundingClientRect();
-				const after = e.clientY > box.top + box.height / 2;
+				order.splice(order.indexOf(dragged), 1);
+				const rect = el.getBoundingClientRect();
+				const after = e.clientY > rect.top + rect.height / 2;
 				order.splice(order.indexOf(pageNumber) + (after ? 1 : 0), 0, dragged);
 				setDirty();
 				renderPanel();
@@ -392,24 +736,50 @@ window.DocStudio.registerViewer('pdfedit', {
 			refreshThumb(pageNumber);
 		}
 		renderPanel();
-		(async function () {
-			for (let i = 1; i <= pageCount; i++) {
-				try {
-					await drawThumb(i);
-				} catch (e) {
-					// Thumbnail not drawn, the number stays
-				}
+
+		/* Rotation: applied at once to the document (visible everywhere), the annotations are kept */
+
+		let busy = false;
+
+		/**
+		 * @param {number} delta 90 or -90
+		 */
+		async function rotateCurrentPage(delta) {
+			if (busy) {
+				return;
 			}
-		})();
+			busy = true;
+			const pageNumber = pdfViewer.currentPageNumber;
+			try {
+				const bytes = await pdfDocument.saveDocument();
+				const doc = await PDFLib.PDFDocument.load(bytes, { updateMetadata: false });
+				const page = doc.getPage(pageNumber - 1);
+				page.setRotation(PDFLib.degrees((page.getRotation().angle + delta + 360) % 360));
+				const rotated = await doc.save();
+				const newDoc = await pdfjsLib.getDocument(Object.assign({ data: rotated, password: password || undefined }, docOptions)).promise;
+				const old = pdfDocument;
+				restore = { page: pageNumber, scale: pdfViewer.currentScale };
+				setDocument(newDoc);
+				old.destroy();
+				setDirty();
+				drawThumbs([pageNumber]);
+			} catch (e) {
+				console.error(e);
+				notice.hidden = false;
+				notice.textContent = /encrypt/i.test(String(e && (e.message || e.name))) ? t('DocStudioEncrypted') : t('DocStudioErrorSave');
+			} finally {
+				busy = false;
+			}
+		}
 
 		/* Toolbar */
 
 		const tools = [
 			{ code: TOOL_NONE, label: t('DocStudioToolSelect'), mode: pdfjsLib.AnnotationEditorType.NONE },
-			{ code: 'text', label: t('DocStudioToolText'), mode: pdfjsLib.AnnotationEditorType.FREETEXT },
-			{ code: 'draw', label: t('DocStudioToolDraw'), mode: pdfjsLib.AnnotationEditorType.INK },
-			{ code: 'highlight', label: t('DocStudioToolHighlight'), mode: pdfjsLib.AnnotationEditorType.HIGHLIGHT },
-			{ code: 'image', label: t('DocStudioToolImage'), mode: pdfjsLib.AnnotationEditorType.STAMP },
+			{ code: TOOL_TEXT, label: t('DocStudioToolText'), mode: pdfjsLib.AnnotationEditorType.NONE },
+			{ code: TOOL_DRAW, label: t('DocStudioToolDraw'), mode: pdfjsLib.AnnotationEditorType.INK },
+			{ code: TOOL_HIGHLIGHT, label: t('DocStudioToolHighlight'), mode: pdfjsLib.AnnotationEditorType.HIGHLIGHT },
+			{ code: TOOL_IMAGE, label: t('DocStudioToolImage'), mode: pdfjsLib.AnnotationEditorType.STAMP },
 			{ code: TOOL_REDACT, label: t('DocStudioToolRedact'), mode: pdfjsLib.AnnotationEditorType.NONE },
 			{ code: TOOL_CROP, label: t('DocStudioToolCrop'), mode: pdfjsLib.AnnotationEditorType.NONE }
 		];
@@ -418,18 +788,58 @@ window.DocStudio.registerViewer('pdfedit', {
 		toolGroup.setAttribute('role', 'toolbar');
 		const toolButtons = {};
 
+		const pageGroup = document.createElement('span');
+		pageGroup.className = 'ds-tools';
+		pageGroup.append(
+			ctx.utils.button('↺', t('DocStudioRotateLeft'), function () {
+				rotateCurrentPage(-90);
+			}),
+			ctx.utils.button('↻', t('DocStudioRotateRight'), function () {
+				rotateCurrentPage(90);
+			}),
+			ctx.utils.button('✂', t('DocStudioSplitHere'), function () {
+				const pageNumber = pdfViewer.currentPageNumber;
+				if (order.indexOf(pageNumber) < order.length - 1) {
+					toggleCut(pageNumber);
+				}
+			})
+		);
+
+		const fontSelect = document.createElement('select');
+		fontSelect.className = 'ds-font';
+		fontSelect.title = t('DocStudioFont');
+		fonts.forEach(function (f) {
+			const option = document.createElement('option');
+			option.value = f.key;
+			option.textContent = f.label;
+			fontSelect.appendChild(option);
+		});
+		const boldLabel = document.createElement('label');
+		boldLabel.className = 'docstudio-check ds-bold';
+		const boldBox = document.createElement('input');
+		boldBox.type = 'checkbox';
+		boldLabel.append(boldBox, document.createTextNode(' ' + t('DocStudioBold')));
 		const color = document.createElement('input');
 		color.type = 'color';
-		color.value = '#c62828';
+		color.value = '#1f2328';
 		color.title = t('DocStudioColor');
 		color.className = 'ds-color';
 		const size = document.createElement('input');
-		size.type = 'range';
+		size.type = 'number';
 		size.min = '1';
-		size.max = '40';
+		size.max = '96';
 		size.value = '12';
 		size.title = t('DocStudioSize');
 		size.className = 'ds-size';
+		const highlightMode = document.createElement('select');
+		highlightMode.className = 'ds-font';
+		highlightMode.title = t('DocStudioHighlightMode');
+		[['free', t('DocStudioHighlightFree')], ['line', t('DocStudioHighlightLine')]].forEach(function (pair) {
+			const option = document.createElement('option');
+			option.value = pair[0];
+			option.textContent = pair[1];
+			highlightMode.appendChild(option);
+		});
 		const cropAllLabel = document.createElement('label');
 		cropAllLabel.className = 'docstudio-check';
 		const cropAllBox = document.createElement('input');
@@ -437,60 +847,107 @@ window.DocStudio.registerViewer('pdfedit', {
 		cropAllBox.addEventListener('change', function () {
 			cropAll = cropAllBox.checked;
 			setDirty();
-			redrawAllZones();
+			redrawAll();
 		});
 		cropAllLabel.append(cropAllBox, document.createTextNode(' ' + t('DocStudioCropAll')));
 		const undoZone = ctx.utils.button('↶', t('DocStudioUndoZone'), function () {
-			if (zones.length) {
-				removeZone(zones[zones.length - 1].id);
+			const last = objects.filter(function (o) {
+				return o.kind === TOOL_REDACT || o.kind === TOOL_CROP || o.kind === 'line';
+			}).pop();
+			if (last) {
+				removeObject(last);
 			}
 		});
 
+		function syncBold() {
+			const font = fontOf(fontSelect.value);
+			const canBold = !font.url || !!font.urlBold;
+			boldBox.disabled = !canBold;
+			if (!canBold) {
+				boldBox.checked = false;
+			}
+		}
+
 		function dispatchParams() {
 			const P = pdfjsLib.AnnotationEditorParamsType;
-			const value = Number(size.value);
-			if (tool === 'text') {
-				eventBus.dispatch('switchannotationeditorparams', { source: null, type: P.FREETEXT_COLOR, value: color.value });
-				eventBus.dispatch('switchannotationeditorparams', { source: null, type: P.FREETEXT_SIZE, value: Math.max(6, value) });
-			} else if (tool === 'draw') {
+			if (tool === TOOL_DRAW) {
 				eventBus.dispatch('switchannotationeditorparams', { source: null, type: P.INK_COLOR, value: color.value });
-				eventBus.dispatch('switchannotationeditorparams', { source: null, type: P.INK_THICKNESS, value: value });
-			} else if (tool === 'highlight') {
+				eventBus.dispatch('switchannotationeditorparams', { source: null, type: P.INK_THICKNESS, value: Math.min(20, Number(size.value)) });
+			} else if (tool === TOOL_HIGHLIGHT && !highlightStraight) {
 				eventBus.dispatch('switchannotationeditorparams', { source: null, type: P.HIGHLIGHT_COLOR, value: color.value });
 			}
 		}
-		color.addEventListener('input', dispatchParams);
-		size.addEventListener('input', dispatchParams);
+
+		function onParamsChange() {
+			if (tool === TOOL_TEXT || (tool === TOOL_NONE && selectedText)) {
+				applyToSelectedText();
+			}
+			dispatchParams();
+		}
+		[fontSelect, boldBox, color, size].forEach(function (input) {
+			input.addEventListener(input.type === 'number' || input.type === 'color' ? 'input' : 'change', function () {
+				if (input === fontSelect) {
+					syncBold();
+				}
+				onParamsChange();
+			});
+		});
+		highlightMode.addEventListener('change', function () {
+			highlightStraight = highlightMode.value === 'line';
+			selectTool(TOOL_HIGHLIGHT);
+		});
+
+		function showParams() {
+			const textParams = tool === TOOL_TEXT || (tool === TOOL_NONE && selectedText !== null);
+			fontSelect.hidden = !textParams;
+			boldLabel.hidden = !textParams;
+			color.hidden = !(textParams || tool === TOOL_DRAW || tool === TOOL_HIGHLIGHT);
+			size.hidden = !(textParams || tool === TOOL_DRAW || (tool === TOOL_HIGHLIGHT && highlightStraight));
+			highlightMode.hidden = tool !== TOOL_HIGHLIGHT;
+			cropAllLabel.hidden = tool !== TOOL_CROP;
+			undoZone.hidden = !(tool === TOOL_REDACT || tool === TOOL_CROP || (tool === TOOL_HIGHLIGHT && highlightStraight));
+		}
 
 		function selectTool(code) {
 			const def = tools.find(function (x) {
 				return x.code === code;
 			});
+			const previous = tool;
 			tool = code;
 			Object.keys(toolButtons).forEach(function (key) {
 				toolButtons[key].classList.toggle('docstudio-active', key === code);
 				toolButtons[key].setAttribute('aria-pressed', key === code ? 'true' : 'false');
 			});
+			const mode = (code === TOOL_HIGHLIGHT && highlightStraight) ? pdfjsLib.AnnotationEditorType.NONE : def.mode;
 			try {
-				pdfViewer.annotationEditorMode = { mode: def.mode };
+				pdfViewer.annotationEditorMode = { mode: mode };
 			} catch (e) {
 				console.error(e);
 			}
-			color.hidden = !['text', 'draw', 'highlight'].includes(code);
-			size.hidden = !['text', 'draw'].includes(code);
-			cropAllLabel.hidden = code !== TOOL_CROP;
-			undoZone.hidden = code !== TOOL_REDACT && code !== TOOL_CROP;
-			if (code === 'highlight' && color.value === '#c62828') {
-				color.value = '#ffff98';
+			if (code !== TOOL_TEXT && code !== TOOL_NONE) {
+				selectedText = null;
 			}
+			if (previous !== code) {
+				if (code === TOOL_HIGHLIGHT) {
+					color.value = '#ffd400';
+					size.value = '12';
+				} else if (code === TOOL_DRAW) {
+					color.value = '#c62828';
+					size.value = '3';
+				} else if (code === TOOL_TEXT) {
+					color.value = '#1f2328';
+					size.value = '12';
+				}
+			}
+			showParams();
 			window.setTimeout(function () {
 				dispatchParams();
-				if (code === 'image') {
+				if (code === TOOL_IMAGE) {
 					// Opens the choice of the image file
 					eventBus.dispatch('switchannotationeditorparams', { source: null, type: pdfjsLib.AnnotationEditorParamsType.CREATE, value: null });
 				}
 			}, 50);
-			redrawAllZones();
+			redrawAll();
 		}
 
 		tools.forEach(function (def) {
@@ -500,7 +957,13 @@ window.DocStudio.registerViewer('pdfedit', {
 			toolButtons[def.code] = btn;
 			toolGroup.appendChild(btn);
 		});
-		ctx.toolbar.append(toolGroup, color, size, cropAllLabel, undoZone);
+		const separator = document.createElement('span');
+		separator.className = 'ds-separator';
+		ctx.toolbar.append(toolGroup, separator, pageGroup, fontSelect, boldLabel, size, color, highlightMode, cropAllLabel, undoZone);
+		syncBold();
+
+		setDocument(pdfDocument);
+		drawThumbs(order.slice());
 		selectTool(TOOL_NONE);
 
 		/* Build the new PDF */
@@ -511,8 +974,8 @@ window.DocStudio.registerViewer('pdfedit', {
 		 */
 		async function textsUnderRedaction() {
 			const secrets = [];
-			for (const z of zones.filter(function (x) {
-				return x.kind === 'redact';
+			for (const z of objects.filter(function (o) {
+				return o.kind === 'redact';
 			})) {
 				const page = await pdfDocument.getPage(z.page);
 				const content = await page.getTextContent();
@@ -529,14 +992,114 @@ window.DocStudio.registerViewer('pdfedit', {
 					}
 				});
 			}
+			// Texts of DocStudio under a zone are hidden too
+			objects.filter(function (o) {
+				return o.kind === 'text';
+			}).forEach(function (o) {
+				if (objects.some(function (z) {
+					return z.kind === 'redact' && z.page === o.page && o.x < z.rect[2] && o.x > z.rect[0] - 1 && o.y < z.rect[3] + 1 && o.y > z.rect[1];
+				})) {
+					o.text.split('\n').forEach(function (line) {
+						if (line.trim().length >= 4) {
+							secrets.push(line.trim());
+						}
+					});
+				}
+			});
 			return secrets;
 		}
 
 		/**
+		 * Write the texts and straight lines of DocStudio in the pages
+		 * @param {Object} doc pdf-lib document
+		 */
+		async function writeObjects(doc) {
+			const embedded = {};
+			const needsFontkit = objects.some(function (o) {
+				return o.kind === 'text' && fontOf(o.font).url;
+			});
+			if (needsFontkit) {
+				await loadScript(ctx.config.fontkit);
+				doc.registerFontkit(window.fontkit);
+			}
+			async function embed(fontKey, bold) {
+				const font = fontOf(fontKey);
+				const key = font.key + (bold ? '-b' : '');
+				if (!embedded[key]) {
+					if (font.standard) {
+						embedded[key] = await doc.embedFont(PDFLib.StandardFonts[bold ? font.standardBold : font.standard]);
+					} else {
+						const url = bold && font.urlBold ? font.urlBold : font.url;
+						const bytes = await (await fetch(url, { credentials: 'same-origin' })).arrayBuffer();
+						embedded[key] = await doc.embedFont(bytes, { subset: true });
+					}
+				}
+				return embedded[key];
+			}
+			for (const o of objects) {
+				const page = doc.getPage(o.page - 1);
+				if (o.kind === 'line') {
+					page.drawLine({
+						start: { x: o.p0[0], y: o.p0[1] },
+						end: { x: o.p1[0], y: o.p1[1] },
+						thickness: o.width,
+						color: rgbOf(o.color),
+						opacity: 0.4,
+						lineCap: PDFLib.LineCapStyle.Butt
+					});
+				} else if (o.kind === 'text' && o.text.trim() !== '') {
+					const pdfFont = await embed(o.font, o.bold);
+					// Direction of the text as shown (rotated pages): from the viewport of the page at scale 1
+					const viewport = (await pdfDocument.getPage(o.page)).getViewport({ scale: 1 });
+					const origin = viewport.convertToViewportPoint(o.x, o.y);
+					const lines = o.text.split('\n');
+					for (let i = 0; i < lines.length; i++) {
+						const base = [origin[0], origin[1] + (ASCENT + i * LINE_HEIGHT) * o.size];
+						const a = viewport.convertToPdfPoint(base[0], base[1]);
+						const b = viewport.convertToPdfPoint(base[0] + 10, base[1]);
+						const angle = Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI;
+						try {
+							page.drawText(lines[i], { x: a[0], y: a[1], size: o.size, font: pdfFont, color: rgbOf(o.color), rotate: PDFLib.degrees(angle) });
+						} catch (e) {
+							throw new Error(t('DocStudioFontCharsetError', fontOf(o.font).label));
+						}
+					}
+				}
+			}
+		}
+
+		/**
+		 * @param {string} hex #rrggbb
+		 * @returns {Object} pdf-lib color
+		 */
+		function rgbOf(hex) {
+			const v = /^#([0-9a-f]{6})$/i.test(hex) ? parseInt(hex.slice(1), 16) : 0;
+			return PDFLib.rgb(((v >> 16) & 255) / 255, ((v >> 8) & 255) / 255, (v & 255) / 255);
+		}
+
+		/**
+		 * Load a script of the module once (fontkit, only when an uploaded font is used)
+		 * @param {string} src
+		 * @returns {Promise<void>}
+		 */
+		function loadScript(src) {
+			if (window.fontkit) {
+				return Promise.resolve();
+			}
+			return new Promise(function (resolve, reject) {
+				const script = document.createElement('script');
+				script.src = src;
+				script.onload = resolve;
+				script.onerror = reject;
+				document.head.appendChild(script);
+			});
+		}
+
+		/**
 		 * Image of a page with its redaction zones painted black, size of the visible area of the page, not rotated
-		 * @param {Object} renderDoc pdf.js document of the annotated content
+		 * @param {Object} renderDoc pdf.js document of the content with the texts and lines written
 		 * @param {number} pageNumber
-		 * @returns {Promise<{bytes: Uint8Array, width: number, height: number}>}
+		 * @returns {Promise<Object>}
 		 */
 		async function redactedImage(renderDoc, pageNumber) {
 			const page = await renderDoc.getPage(pageNumber);
@@ -549,10 +1112,10 @@ window.DocStudio.registerViewer('pdfedit', {
 			context.fillRect(0, 0, canvas.width, canvas.height);
 			await page.render({ canvas: canvas, canvasContext: context, viewport: viewport, intent: 'print', annotationMode: pdfjsLib.AnnotationMode.ENABLE }).promise;
 			context.fillStyle = '#000000';
-			zones.filter(function (z) {
-				return z.kind === 'redact' && z.page === pageNumber;
-			}).forEach(function (z) {
-				const r = viewport.convertToViewportRectangle(z.rect);
+			objects.filter(function (o) {
+				return o.kind === 'redact' && o.page === pageNumber;
+			}).forEach(function (o) {
+				const r = viewport.convertToViewportRectangle(o.rect);
 				context.fillRect(Math.min(r[0], r[2]) - 1, Math.min(r[1], r[3]) - 1, Math.abs(r[2] - r[0]) + 2, Math.abs(r[3] - r[1]) + 2);
 			});
 			const blob = await new Promise(function (resolve) {
@@ -563,11 +1126,29 @@ window.DocStudio.registerViewer('pdfedit', {
 		}
 
 		/**
+		 * @returns {number[][]} page numbers of each file (several when the PDF is split)
+		 */
+		function parts() {
+			const result = [[]];
+			order.forEach(function (pageNumber) {
+				if (deleted.has(pageNumber)) {
+					return;
+				}
+				result[result.length - 1].push(pageNumber);
+				if (cuts.has(pageNumber)) {
+					result.push([]);
+				}
+			});
+			return result.filter(function (list) {
+				return list.length;
+			});
+		}
+
+		/**
 		 * @param {function(string)} progress
-		 * @returns {Promise<Uint8Array>}
+		 * @returns {Promise<{bytes: Uint8Array, redacted: boolean}>} the whole new PDF, pages in the new order
 		 */
 		async function buildPdf(progress) {
-			const PDFLib = await import(ctx.config.pdflib);
 			progress(t('DocStudioPreparing'));
 			const annotated = await pdfDocument.saveDocument();
 			let src;
@@ -579,40 +1160,35 @@ window.DocStudio.registerViewer('pdfedit', {
 				}
 				throw e;
 			}
+			const pageTotal = src.getPageCount();
 
-			const redactPages = new Set(zones.filter(function (z) {
-				return z.kind === 'redact';
-			}).map(function (z) {
-				return z.page;
+			// Texts and straight lines written in the pages first (so a redaction covers them too)
+			if (objects.some(function (o) {
+				return o.kind === 'text' || o.kind === 'line';
+			})) {
+				await writeObjects(src);
+			}
+
+			const redactPages = new Set(objects.filter(function (o) {
+				return o.kind === 'redact';
+			}).map(function (o) {
+				return o.page;
 			}));
+			const crop = lastCrop();
 			const cropOf = function (pageNumber) {
-				const own = zones.find(function (z) {
-					return z.kind === 'crop' && z.page === pageNumber;
+				const own = objects.find(function (o) {
+					return o.kind === 'crop' && o.page === pageNumber;
 				});
-				if (own) {
-					return own.rect;
-				}
-				if (cropAll) {
-					const last = zones.find(function (z) {
-						return z.id === lastCropId();
-					});
-					return last ? last.rect : null;
-				}
-				return null;
+				return own ? own.rect : (cropAll && crop ? crop.rect : null);
 			};
 			const finalOrder = order.filter(function (p) {
 				return !deleted.has(p);
 			});
 
-			// Rotation and crop on the pages of the source
 			src.getPages().forEach(function (page, index) {
-				const pageNumber = index + 1;
-				if (rotation[pageNumber]) {
-					page.setRotation(PDFLib.degrees((page.getRotation().angle + rotation[pageNumber]) % 360));
-				}
-				const crop = cropOf(pageNumber);
-				if (crop) {
-					page.setCropBox(crop[0], crop[1], crop[2] - crop[0], crop[3] - crop[1]);
+				const c = cropOf(index + 1);
+				if (c) {
+					page.setCropBox(c[0], c[1], c[2] - c[0], c[3] - c[1]);
 				}
 			});
 
@@ -620,24 +1196,24 @@ window.DocStudio.registerViewer('pdfedit', {
 			if (redactPages.size) {
 				// New document: nothing of the source comes with it except the pages (no metadata, bookmarks,
 				// attachments, form fields nor previous versions), redacted pages replaced by their image
-				const renderDoc = await pdfjsLib.getDocument(Object.assign({ data: annotated.slice(0), password: password || undefined }, docOptions)).promise;
+				const written = await src.save();
+				const renderDoc = await pdfjsLib.getDocument(Object.assign({ data: written.slice(0) }, docOptions)).promise;
+				const clean = await PDFLib.PDFDocument.load(written, { updateMetadata: false });
 				out = await PDFLib.PDFDocument.create({ updateMetadata: false });
 				for (const pageNumber of finalOrder) {
 					if (redactPages.has(pageNumber)) {
-						progress(t('DocStudioPreparing') + ' ' + pageNumber + '/' + pageCount);
+						progress(t('DocStudioPreparing') + ' ' + pageNumber + '/' + pageTotal);
 						const image = await redactedImage(renderDoc, pageNumber);
 						const jpg = await out.embedJpg(image.bytes);
 						const page = out.addPage([image.width, image.height]);
 						page.drawImage(jpg, { x: 0, y: 0, width: image.width, height: image.height });
-						const srcPage = src.getPage(pageNumber - 1);
-						page.setRotation(srcPage.getRotation());
-						const crop = cropOf(pageNumber);
-						if (crop) {
-							// Zone in the units of the page, from the origin of its visible area
-							page.setCropBox(crop[0] - image.view[0], crop[1] - image.view[1], crop[2] - crop[0], crop[3] - crop[1]);
+						page.setRotation(clean.getPage(pageNumber - 1).getRotation());
+						const c = cropOf(pageNumber);
+						if (c) {
+							page.setCropBox(c[0] - image.view[0], c[1] - image.view[1], c[2] - c[0], c[3] - c[1]);
 						}
 					} else {
-						const copied = await out.copyPages(src, [pageNumber - 1]);
+						const copied = await out.copyPages(clean, [pageNumber - 1]);
 						out.addPage(copied[0]);
 					}
 				}
@@ -650,14 +1226,14 @@ window.DocStudio.registerViewer('pdfedit', {
 				out.setProducer('DocStudio');
 			} else {
 				out = src;
-				const unchangedOrder = finalOrder.length === pageCount && finalOrder.every(function (p, i) {
+				const unchanged = finalOrder.length === pageTotal && finalOrder.every(function (p, i) {
 					return p === i + 1;
 				});
-				if (!unchangedOrder) {
+				if (!unchanged) {
 					const copies = await src.copyPages(src, finalOrder.map(function (p) {
 						return p - 1;
 					}));
-					for (let i = pageCount - 1; i >= 0; i--) {
+					for (let i = pageTotal - 1; i >= 0; i--) {
 						src.removePage(i);
 					}
 					copies.forEach(function (page) {
@@ -671,7 +1247,7 @@ window.DocStudio.registerViewer('pdfedit', {
 				progress(t('DocStudioPreparing'));
 				await checkRedaction(bytes, await textsUnderRedaction());
 			}
-			return bytes;
+			return { bytes: bytes, redacted: redactPages.size > 0 };
 		}
 
 		/**
@@ -693,12 +1269,38 @@ window.DocStudio.registerViewer('pdfedit', {
 			}
 			check.destroy();
 			const raw = new TextDecoder('latin1').decode(bytes);
-			const found = secrets.filter(function (s) {
+			if (secrets.some(function (s) {
 				return all.indexOf(s) >= 0 || raw.indexOf(s) >= 0;
-			});
-			if (found.length) {
+			})) {
 				throw new Error(t('DocStudioRedactCheckFailed'));
 			}
+		}
+
+		/**
+		 * Files to save: the whole PDF, or one file per part when it is split
+		 * @param {Uint8Array} bytes Whole new PDF (pages in the new order)
+		 * @returns {Promise<Uint8Array[]>}
+		 */
+		async function splitFiles(bytes) {
+			const list = parts();
+			if (list.length < 2) {
+				return [bytes];
+			}
+			const whole = await PDFLib.PDFDocument.load(bytes, { updateMetadata: false });
+			const files = [];
+			let index = 0;
+			for (const part of list) {
+				const doc = await PDFLib.PDFDocument.create({ updateMetadata: false });
+				const indexes = part.map(function (p, i) {
+					return index + i;
+				});
+				index += part.length;
+				(await doc.copyPages(whole, indexes)).forEach(function (page) {
+					doc.addPage(page);
+				});
+				files.push(await doc.save({ useObjectStreams: true }));
+			}
+			return files;
 		}
 
 		/* Save dialog */
@@ -736,6 +1338,8 @@ window.DocStudio.registerViewer('pdfedit', {
 		const replaceWarning = document.createElement('p');
 		replaceWarning.className = 'ds-warning';
 		replaceWarning.textContent = t('DocStudioSaveReplaceWarning');
+		const splitInfo = document.createElement('p');
+		splitInfo.className = 'ds-warning';
 		const impact = document.createElement('div');
 		impact.className = 'ds-impact';
 		const status = document.createElement('p');
@@ -757,13 +1361,37 @@ window.DocStudio.registerViewer('pdfedit', {
 		});
 		confirm.classList.add('docstudio-primary');
 		buttons.append(cancel, confirm);
-		form.append(heading, copyLabel, nameLabel, replaceLabel, replaceWarning, impact, overwriteLabel, status, buttons);
+		form.append(heading, copyLabel, nameLabel, replaceLabel, replaceWarning, splitInfo, impact, overwriteLabel, status, buttons);
 		dialog.appendChild(form);
 		document.body.appendChild(dialog);
 
+		/**
+		 * @returns {string[]} names of the files saved
+		 */
+		function fileNames() {
+			const count = parts().length;
+			const name = nameInput.value.trim() || ctx.config.copyName;
+			if (count < 2) {
+				return [name];
+			}
+			const base = name.replace(/\.pdf$/i, '');
+			const names = [];
+			for (let i = 1; i <= count; i++) {
+				names.push(base + '-' + i + '.pdf');
+			}
+			return names;
+		}
+
 		function syncDialog() {
+			const split = parts().length > 1;
+			if (split) {
+				copyRadio.checked = true;
+			}
+			replaceRadio.disabled = split;
 			nameInput.disabled = !copyRadio.checked;
 			replaceWarning.hidden = !replaceRadio.checked;
+			splitInfo.hidden = !split;
+			splitInfo.textContent = split ? t('DocStudioSplitParts', parts().length, fileNames().join(', ')) : '';
 			if (replaceRadio.checked) {
 				overwriteLabel.hidden = true;
 			}
@@ -773,19 +1401,23 @@ window.DocStudio.registerViewer('pdfedit', {
 		nameInput.addEventListener('input', function () {
 			overwriteLabel.hidden = true;
 			overwriteBox.checked = false;
+			syncDialog();
 		});
 
 		saveButton.addEventListener('click', function () {
+			if (document.activeElement && document.activeElement.isContentEditable) {
+				document.activeElement.blur();
+			}
 			impact.replaceChildren();
-			if (zones.some(function (z) {
-				return z.kind === 'redact';
+			if (objects.some(function (o) {
+				return o.kind === 'redact';
 			})) {
 				const p = document.createElement('p');
 				p.textContent = t('DocStudioRedactImpact');
 				impact.appendChild(p);
 			}
-			if (zones.some(function (z) {
-				return z.kind === 'crop';
+			if (objects.some(function (o) {
+				return o.kind === 'crop';
 			})) {
 				const p = document.createElement('p');
 				p.textContent = t('DocStudioCropImpact');
@@ -804,26 +1436,33 @@ window.DocStudio.registerViewer('pdfedit', {
 			saving = true;
 			confirm.disabled = true;
 			try {
-				const bytes = await buildPdf(function (text) {
+				const built = await buildPdf(function (text) {
 					status.textContent = text;
 				});
-				status.textContent = t('DocStudioSaving');
-				const result = await window.DocStudio.saveContent(new Blob([bytes], { type: 'application/pdf' }), {
-					mode: replaceRadio.checked ? 'replace' : 'copy',
-					filename: nameInput.value,
-					overwrite: overwriteBox.checked
-				});
-				if (result.result > 0) {
-					dirty = false;
-					window.location.href = ctx.config.backUrl;
+				const files = await splitFiles(built.bytes);
+				const names = fileNames();
+				const saved = [];
+				for (let i = 0; i < files.length; i++) {
+					status.textContent = t('DocStudioSaving') + (files.length > 1 ? ' ' + (i + 1) + '/' + files.length : '');
+					const result = await window.DocStudio.saveContent(new Blob([files[i]], { type: 'application/pdf' }), {
+						mode: (files.length === 1 && replaceRadio.checked) ? 'replace' : 'copy',
+						filename: names[i],
+						overwrite: overwriteBox.checked
+					});
+					if (result.result > 0) {
+						saved.push(result.filename);
+						continue;
+					}
+					if (result.exists) {
+						overwriteLabel.hidden = false;
+						status.textContent = t('DocStudioFileExists', result.filename) + (saved.length ? ' ' + t('DocStudioPartsSaved', saved.join(', ')) : '');
+					} else {
+						status.textContent = (result.error || t('DocStudioErrorSave')) + (saved.length ? ' ' + t('DocStudioPartsSaved', saved.join(', ')) : '');
+					}
 					return;
 				}
-				if (result.exists) {
-					overwriteLabel.hidden = false;
-					status.textContent = t('DocStudioFileExists', result.filename);
-				} else {
-					status.textContent = result.error || t('DocStudioErrorSave');
-				}
+				dirty = false;
+				window.location.href = ctx.config.backUrl;
 			} catch (e) {
 				console.error(e);
 				status.textContent = (e && e.message) ? e.message : t('DocStudioErrorSave');
@@ -844,6 +1483,7 @@ window.DocStudio.registerViewer('pdfedit', {
 		return {
 			unmount() {
 				window.removeEventListener('beforeunload', onBeforeUnload);
+				document.removeEventListener('keydown', onKey);
 				dialog.remove();
 				pdfViewer.setDocument(null);
 				pdfDocument.destroy();

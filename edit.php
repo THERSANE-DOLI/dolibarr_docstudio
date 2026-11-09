@@ -47,6 +47,7 @@ if (!$res) {
 
 dol_include_once('/docstudio/class/docstudio.class.php');
 dol_include_once('/docstudio/lib/docstudio.lib.php');
+dol_include_once('/docstudio/class/docstudiofonts.class.php');
 
 /**
  * @var Conf $conf
@@ -182,6 +183,8 @@ if ($provider !== null && count($viewers)) {
 		'backUrl' => $backtopage,
 		'copyName' => preg_replace('/\.[^.]*$/', '', $provider->getFileName()).'-'.dol_sanitizeFileName($langs->transnoentitiesnoconv('DocStudioCopySuffix')).'.'.$provider->getExtension(),
 		'stirling' => false,
+		'fonts' => DocStudioFonts::forEditor(),
+		'fontkit' => dol_buildpath('/docstudio/vendor/fontkit/fontkit.umd.min.js', 1),
 		'imageMimeTypes' => DocStudio::getImageMimeTypes(),
 		'pdflib' => dol_buildpath('/docstudio/vendor/pdflib/pdf-lib.esm.min.js', 1),
 		'pdfjs' => array(
@@ -206,6 +209,9 @@ if ($provider !== null && count($viewers)) {
 			'DocStudioDeletePage', 'DocStudioRestorePage', 'DocStudioColor', 'DocStudioSize', 'DocStudioRedactHelp',
 			'DocStudioRedactImpact', 'DocStudioCropHelp', 'DocStudioCropAll', 'DocStudioRemoveZone', 'DocStudioRedactCheckFailed',
 			'DocStudioEncrypted', 'DocStudioPreparing', 'DocStudioCropImpact', 'DocStudioUndoZone', 'DocStudioPdfPassword',
+			'DocStudioRotateLeft', 'DocStudioRotateRight', 'DocStudioSplitHere', 'DocStudioSplitRemove', 'DocStudioSplitParts',
+			'DocStudioPartsSaved', 'DocStudioFont', 'DocStudioBold', 'DocStudioHighlightMode', 'DocStudioHighlightFree',
+			'DocStudioHighlightLine', 'DocStudioFontCharsetError', 'DocStudioTextPlaceholder', 'DocStudioMove',
 		)),
 	);
 	docstudioPrintJsonData('docstudio-config', $config);

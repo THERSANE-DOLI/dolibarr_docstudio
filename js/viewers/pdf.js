@@ -528,7 +528,18 @@ window.DocStudio.registerViewer('pdf', {
 			}, 150);
 		}
 
+		// Ctrl + wheel zooms the PDF only, not the whole page
+		function onWheel(e) {
+			if (!e.ctrlKey && !e.metaKey) {
+				return;
+			}
+			e.preventDefault();
+			zoom = Math.min(4, Math.max(0.25, currentScale() * (e.deltaY < 0 ? 1.1 : 1 / 1.1)));
+			layout();
+		}
+
 		scroller.addEventListener('scroll', onScroll, { passive: true });
+		scroller.addEventListener('wheel', onWheel, { passive: false });
 		window.addEventListener('resize', onResize);
 		document.addEventListener('keydown', onKey);
 		layout();
@@ -537,6 +548,7 @@ window.DocStudio.registerViewer('pdf', {
 		return {
 			unmount() {
 				scroller.removeEventListener('scroll', onScroll);
+				scroller.removeEventListener('wheel', onWheel);
 				window.removeEventListener('resize', onResize);
 				document.removeEventListener('keydown', onKey);
 				if (thumbObserver) {

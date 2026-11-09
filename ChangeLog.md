@@ -1,5 +1,22 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.4
+
+- NEW: PDF editor, texts with fonts, straight highlight, rotation and split in the toolbar :   0.4.0
+  - texts of DocStudio instead of the text tool of pdf.js: movable by their handle, editable until saving,
+    font, size, color and bold for the new text and the selected one, plain text only, written in the pages
+    when saving (only the characters used are embedded)
+  - setup tab « Fonts »: the 3 standard fonts of PDF, and TrueType / OpenType fonts uploaded by the administrator
+    (signature of the file checked, stored on the server, nothing fetched from the Internet)
+  - highlight: on the text or free hand (pdf.js), or straight line (horizontal or vertical when close to it,
+    any angle with Shift)
+  - rotation of the current page left or right in the toolbar, applied at once and visible everywhere
+  - split into several files: scissors between the pages of the panel or in the toolbar, files named
+    name-1.pdf, name-2.pdf...
+  - Ctrl + wheel zooms the PDF only, in the editor and in the viewer
+  - no « Alt text » button on the images
+  - @pdf-lib/fontkit 1.1.1 embedded (MIT)
+
 ## 0.3
 
 - NEW: PDF editor without server (annotations, pages, crop, redaction) :   0.3.0

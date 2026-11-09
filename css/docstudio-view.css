@@ -584,6 +584,133 @@ body {
 	font-size: 13px;
 }
 
+/* No alternative text button on the images (the description is not used by DocStudio) */
+.ds-edit-viewer .editToolbar .altText,
+.ds-edit-viewer .editToolbar .divider {
+	display: none !important;
+}
+
+.ds-separator {
+	width: 1px;
+	align-self: stretch;
+	background: var(--ds-border);
+	margin: 0 4px;
+}
+
+.ds-font {
+	font: inherit;
+	color: var(--ds-text);
+	background: var(--ds-surface);
+	border: 1px solid var(--ds-border);
+	border-radius: 4px;
+	min-height: 30px;
+	padding: 0 4px;
+}
+
+.ds-size {
+	width: 64px !important;
+	font: inherit;
+	color: var(--ds-text);
+	background: var(--ds-surface);
+	border: 1px solid var(--ds-border);
+	border-radius: 4px;
+	min-height: 30px;
+	padding: 0 4px;
+}
+
+.ds-lines {
+	position: absolute;
+	left: 0;
+	top: 0;
+	overflow: visible;
+	pointer-events: none;
+}
+
+.ds-lines .ds-line {
+	pointer-events: stroke;
+	cursor: pointer;
+}
+
+.ds-text {
+	position: absolute;
+	pointer-events: auto;
+	padding: 0;
+	border: 1px dashed transparent;
+	min-width: 8px;
+}
+
+.ds-text:hover,
+.ds-text.ds-text-selected {
+	border-color: #1565c0;
+}
+
+.ds-text-content {
+	white-space: pre;
+	outline: none;
+	min-width: 1ch;
+	cursor: text;
+}
+
+.ds-text-content:empty::before {
+	content: attr(data-placeholder);
+	opacity: 0.45;
+}
+
+.ds-text-move {
+	position: absolute;
+	left: -22px;
+	top: -2px;
+	width: 18px;
+	height: 18px;
+	line-height: 18px;
+	text-align: center;
+	font-size: 12px;
+	border-radius: 3px;
+	background: #1565c0;
+	color: #ffffff;
+	cursor: move;
+	visibility: hidden;
+	touch-action: none;
+}
+
+.ds-text .ds-zone-remove {
+	visibility: hidden;
+}
+
+.ds-text:hover .ds-text-move,
+.ds-text.ds-text-selected .ds-text-move,
+.ds-text:hover .ds-zone-remove,
+.ds-text.ds-text-selected .ds-zone-remove {
+	visibility: visible;
+}
+
+.ds-zone-layer.ds-text-tool {
+	cursor: text;
+}
+
+.ds-cut {
+	width: 100%;
+	border: 0;
+	border-top: 2px dashed transparent;
+	background: none;
+	color: var(--ds-muted);
+	cursor: pointer;
+	font-size: 13px;
+	line-height: 1;
+	padding: 2px 0;
+	opacity: 0.35;
+}
+
+.ds-cut:hover {
+	opacity: 1;
+}
+
+.ds-cut.ds-cut-active {
+	opacity: 1;
+	color: #b42318;
+	border-top-color: #b42318;
+}
+
 /* Links of the PDF never active in the editor */
 .ds-edit-viewer .annotationLayer .linkAnnotation,
 .ds-edit-viewer .annotationLayer a {

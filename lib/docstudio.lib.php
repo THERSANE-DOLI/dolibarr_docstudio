@@ -45,6 +45,11 @@ function docstudioAdminPrepareHead()
 	$head[$h][2] = 'associations';
 	$h++;
 
+	$head[$h][0] = dol_buildpath("/docstudio/admin/fonts.php", 1);
+	$head[$h][1] = $langs->trans("DocStudioFonts");
+	$head[$h][2] = 'fonts';
+	$h++;
+
 	$head[$h][0] = dol_buildpath("/docstudio/admin/about.php", 1);
 	$head[$h][1] = $langs->trans("About");
 	$head[$h][2] = 'about';
