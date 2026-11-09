@@ -1,5 +1,11 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.6
+
+- NEW: PDF editor, split directly between the pages of the document :   0.6.0
+  - more space between the pages, scissors on a dashed line in it, label « Split the PDF after this page » on hover,
+    same split as the scissors of the panel (both shown at once)
+
 ## 0.5
 
 - FIX: PDF editor, a deleted page did not look deleted, scissors out of the toolbar and on the dashed line :   0.5.1

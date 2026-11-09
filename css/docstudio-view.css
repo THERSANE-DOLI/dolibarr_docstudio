@@ -736,6 +736,33 @@ body {
 	border-top-color: #b42318;
 }
 
+/* More space between the pages of the editor, with the scissors in it */
+.ds-edit-viewer .pdfViewer {
+	--page-margin: 1px auto 36px;
+}
+
+.ds-page-cut {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 100%;
+	height: 44px;
+	width: auto;
+	padding: 0;
+	z-index: 5;
+}
+
+.ds-page-cut-label {
+	font-size: 12px;
+	white-space: nowrap;
+	display: none;
+}
+
+.ds-page-cut:hover .ds-page-cut-label,
+.ds-page-cut.ds-cut-active .ds-page-cut-label {
+	display: inline;
+}
+
 /* Deleted page: veil and stamp over the page until saving */
 .ds-deleted {
 	position: absolute;

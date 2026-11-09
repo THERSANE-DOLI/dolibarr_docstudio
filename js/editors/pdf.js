@@ -377,6 +377,7 @@ window.DocStudio.registerViewer('pdfedit', {
 
 		eventBus.on('pagerendered', function (e) {
 			drawLayer(e.pageNumber);
+			cutMark(e.pageNumber);
 		});
 
 		/* Texts of DocStudio */
@@ -730,6 +731,38 @@ window.DocStudio.registerViewer('pdfedit', {
 			}
 			setDirty();
 			renderPanel();
+			for (let i = 1; i <= pdfDocument.numPages; i++) {
+				cutMark(i);
+			}
+		}
+
+		/**
+		 * Scissors in the space under a page of the document (same split as the scissors of the panel)
+		 * @param {number} pageNumber
+		 */
+		function cutMark(pageNumber) {
+			const pageView = pdfViewer.getPageView(pageNumber - 1);
+			if (!pageView || !pageView.div || pageNumber >= pdfDocument.numPages) {
+				return;
+			}
+			let mark = pageView.div.querySelector(':scope > .ds-page-cut');
+			if (!mark) {
+				mark = document.createElement('button');
+				mark.type = 'button';
+				mark.className = 'ds-cut ds-page-cut';
+				mark.appendChild(icon('split'));
+				const label = document.createElement('span');
+				label.className = 'ds-page-cut-label';
+				mark.appendChild(label);
+				mark.addEventListener('click', function () {
+					toggleCut(pageNumber);
+				});
+				pageView.div.appendChild(mark);
+			}
+			const active = cuts.has(pageNumber);
+			mark.classList.toggle('ds-cut-active', active);
+			mark.title = active ? t('DocStudioSplitRemove') : t('DocStudioSplitHere');
+			mark.querySelector('.ds-page-cut-label').textContent = active ? t('DocStudioSplitRemove') : t('DocStudioSplitHere');
 		}
 
 		for (let i = 1; i <= pageCount; i++) {
