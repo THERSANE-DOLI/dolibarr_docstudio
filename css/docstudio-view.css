@@ -824,3 +824,140 @@ body {
 		display: none;
 	}
 }
+
+/* Palette of the tools of the editor (like the image editors: icons on the left, options of the tool on top) */
+.ds-icon {
+	width: 20px;
+	height: 20px;
+	flex: 0 0 auto;
+}
+
+.ds-palette {
+	flex: 0 0 auto;
+	width: 48px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: 8px 0;
+	background: var(--ds-surface);
+	border-right: 1px solid var(--ds-border);
+	overflow-y: auto;
+}
+
+.ds-palette-button {
+	position: relative;
+	width: 36px;
+	height: 36px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	background: none;
+	color: var(--ds-text);
+	cursor: pointer;
+}
+
+.ds-palette-button:hover,
+.ds-palette-button:focus-visible {
+	border-color: var(--ds-border);
+	outline: none;
+}
+
+.ds-palette-button.docstudio-active {
+	background: var(--ds-accent);
+	border-color: var(--ds-accent);
+	color: #ffffff;
+}
+
+:root[data-darkmode="1"] .ds-palette-button.docstudio-active {
+	color: #10151c;
+}
+
+/* Small triangle of a group: the other tools of the same kind */
+.ds-group-more {
+	position: absolute;
+	right: 1px;
+	bottom: 1px;
+	width: 0;
+	height: 0;
+	border-left: 6px solid transparent;
+	border-bottom: 6px solid currentColor;
+	opacity: 0.7;
+	cursor: pointer;
+}
+
+.ds-palette-separator {
+	width: 28px;
+	height: 1px;
+	margin: 4px 0;
+	background: var(--ds-border);
+}
+
+.ds-flyout {
+	position: absolute;
+	z-index: 50;
+	min-width: 220px;
+	padding: 4px;
+	background: var(--ds-surface);
+	border: 1px solid var(--ds-border);
+	border-radius: 6px;
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+	display: flex;
+	flex-direction: column;
+}
+
+.ds-flyout-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 6px 10px;
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	color: var(--ds-text);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.ds-flyout-item span {
+	flex: 1 1 auto;
+}
+
+.ds-flyout-item kbd {
+	font: inherit;
+	font-size: 12px;
+	color: var(--ds-muted);
+}
+
+.ds-flyout-item:hover,
+.ds-flyout-item:focus-visible,
+.ds-flyout-item.docstudio-active {
+	background: var(--ds-bg);
+	outline: none;
+}
+
+.ds-toolname {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-weight: 600;
+	padding-right: 8px;
+	margin-right: 4px;
+	border-right: 1px solid var(--ds-border);
+}
+
+.ds-option {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--ds-muted);
+	white-space: nowrap;
+}
+
+.ds-hint {
+	white-space: normal;
+}

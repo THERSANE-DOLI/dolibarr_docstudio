@@ -1,5 +1,16 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.5
+
+- NEW: PDF editor laid out like the image editors: palette of tools on the left, options of the tool on top :   0.5.0
+  - vertical palette with icons: Select, Text, Draw / Highlight / Straight line (group opened by its small triangle,
+    a right click or a long press, the button shows the last tool used), Image, Redact, Crop, then the actions on
+    the current page: rotate left, rotate right, split after it, delete it
+  - top bar: name of the tool, its options only (font, bold, size, color, same frame for every page, remove the
+    last zone, choose an image) and a short help
+  - keyboard shortcuts of the tools: V, T, B, H, L, I, X, C
+  - icons of Tabler Icons 3.50.0 (MIT) in an inline sprite (no request)
+
 ## 0.4
 
 - FIX: PDF editor, rotating a page emptied the editor (no page, tools inactive) :   0.4.1

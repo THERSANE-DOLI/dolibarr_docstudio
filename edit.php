@@ -135,6 +135,8 @@ foreach ($viewers as $viewer) {
 docstudioPrintJsContext($nonce);
 print '</head>'."\n";
 print '<body>'."\n";
+// Icons of the tools (inline sprite: no request, allowed by the content security policy)
+print file_get_contents(__DIR__.'/img/docstudio-icons.svg');
 
 print '<header class="docstudio-toolbar">';
 print '<a class="docstudio-button docstudio-back" id="docstudio-back" href="'.dol_escape_htmltag($backtopage).'" title="'.dol_escape_htmltag($langs->trans('DocStudioBack')).'">&#8592;</a>';
@@ -212,6 +214,8 @@ if ($provider !== null && count($viewers)) {
 			'DocStudioRotateLeft', 'DocStudioRotateRight', 'DocStudioSplitHere', 'DocStudioSplitRemove', 'DocStudioSplitParts',
 			'DocStudioPartsSaved', 'DocStudioFont', 'DocStudioBold', 'DocStudioHighlightMode', 'DocStudioHighlightFree',
 			'DocStudioHighlightLine', 'DocStudioFontCharsetError', 'DocStudioTextPlaceholder', 'DocStudioMove',
+			'DocStudioTools', 'DocStudioMoreTools', 'DocStudioChooseImage', 'DocStudioHintSelect', 'DocStudioHintText', 'DocStudioHintDraw',
+			'DocStudioHintHighlight', 'DocStudioHintLine',
 		)),
 	);
 	docstudioPrintJsonData('docstudio-config', $config);

@@ -31,6 +31,7 @@ const TOOL_NONE = 'none';
 const TOOL_TEXT = 'text';
 const TOOL_DRAW = 'draw';
 const TOOL_HIGHLIGHT = 'highlight';
+const TOOL_LINE = 'line';
 const TOOL_IMAGE = 'image';
 const TOOL_REDACT = 'redact';
 const TOOL_CROP = 'crop';
@@ -77,7 +78,6 @@ window.DocStudio.registerViewer('pdfedit', {
 
 		let dirty = false;
 		let tool = TOOL_NONE;
-		let highlightStraight = false;
 		// Objects of DocStudio on the pages, positions in PDF units:
 		// redact / crop {rect}, line {p0, p1, color, width}, text {x, y, text, font, size, color, bold}
 		const objects = [];
@@ -267,7 +267,7 @@ window.DocStudio.registerViewer('pdfedit', {
 				return;
 			}
 			layer.replaceChildren();
-			layer.classList.toggle('ds-zone-active', [TOOL_REDACT, TOOL_CROP, TOOL_TEXT].includes(tool) || (tool === TOOL_HIGHLIGHT && highlightStraight));
+			layer.classList.toggle('ds-zone-active', [TOOL_REDACT, TOOL_CROP, TOOL_TEXT, TOOL_LINE].includes(tool));
 			layer.classList.toggle('ds-text-tool', tool === TOOL_TEXT);
 
 			const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -518,7 +518,7 @@ window.DocStudio.registerViewer('pdfedit', {
 				}
 				return;
 			}
-			const kind = (tool === TOOL_HIGHLIGHT && highlightStraight) ? 'line' : tool;
+			const kind = tool;
 			if (kind !== TOOL_REDACT && kind !== TOOL_CROP && kind !== 'line') {
 				return;
 			}
@@ -795,76 +795,248 @@ window.DocStudio.registerViewer('pdfedit', {
 			}
 		}
 
-		/* Toolbar */
+		/* Tools: vertical palette (with groups of tools of the same kind), options of the tool in the top bar */
 
+		const SVG_NS = 'http://www.w3.org/2000/svg';
+
+		/**
+		 * @param {string} name Icon of the sprite of the page (img/docstudio-icons.svg)
+		 * @returns {SVGElement}
+		 */
+		function icon(name) {
+			const svg = document.createElementNS(SVG_NS, 'svg');
+			svg.setAttribute('class', 'ds-icon');
+			svg.setAttribute('aria-hidden', 'true');
+			const use = document.createElementNS(SVG_NS, 'use');
+			use.setAttribute('href', '#ds-i-' + name);
+			svg.appendChild(use);
+			return svg;
+		}
+
+		const E = pdfjsLib.AnnotationEditorType;
 		const tools = [
-			{ code: TOOL_NONE, label: t('DocStudioToolSelect'), mode: pdfjsLib.AnnotationEditorType.NONE },
-			{ code: TOOL_TEXT, label: t('DocStudioToolText'), mode: pdfjsLib.AnnotationEditorType.NONE },
-			{ code: TOOL_DRAW, label: t('DocStudioToolDraw'), mode: pdfjsLib.AnnotationEditorType.INK },
-			{ code: TOOL_HIGHLIGHT, label: t('DocStudioToolHighlight'), mode: pdfjsLib.AnnotationEditorType.HIGHLIGHT },
-			{ code: TOOL_IMAGE, label: t('DocStudioToolImage'), mode: pdfjsLib.AnnotationEditorType.STAMP },
-			{ code: TOOL_REDACT, label: t('DocStudioToolRedact'), mode: pdfjsLib.AnnotationEditorType.NONE },
-			{ code: TOOL_CROP, label: t('DocStudioToolCrop'), mode: pdfjsLib.AnnotationEditorType.NONE }
+			{ code: TOOL_NONE, label: t('DocStudioToolSelect'), icon: 'select', key: 'v', mode: E.NONE },
+			{ code: TOOL_TEXT, label: t('DocStudioToolText'), icon: 'text', key: 't', mode: E.NONE },
+			{ code: TOOL_DRAW, label: t('DocStudioToolDraw'), icon: 'draw', key: 'b', mode: E.INK, group: 'mark' },
+			{ code: TOOL_HIGHLIGHT, label: t('DocStudioToolHighlight'), icon: 'highlight', key: 'h', mode: E.HIGHLIGHT, group: 'mark' },
+			{ code: TOOL_LINE, label: t('DocStudioHighlightLine'), icon: 'line', key: 'l', mode: E.NONE, group: 'mark' },
+			{ code: TOOL_IMAGE, label: t('DocStudioToolImage'), icon: 'image', key: 'i', mode: E.STAMP },
+			{ code: TOOL_REDACT, label: t('DocStudioToolRedact'), icon: 'redact', key: 'x', mode: E.NONE },
+			{ code: TOOL_CROP, label: t('DocStudioToolCrop'), icon: 'crop', key: 'c', mode: E.NONE }
 		];
-		const toolGroup = document.createElement('span');
-		toolGroup.className = 'ds-tools';
-		toolGroup.setAttribute('role', 'toolbar');
-		const toolButtons = {};
+		const toolOf = function (code) {
+			return tools.find(function (x) {
+				return x.code === code;
+			});
+		};
+		const groupCurrent = { mark: TOOL_DRAW };
+		const slotButtons = {};		// tool code or group => button
+		let flyout = null;
 
-		const pageGroup = document.createElement('span');
-		pageGroup.className = 'ds-tools';
-		pageGroup.append(
-			ctx.utils.button('↺', t('DocStudioRotateLeft'), function () {
-				rotateCurrentPage(-90);
-			}),
-			ctx.utils.button('↻', t('DocStudioRotateRight'), function () {
-				rotateCurrentPage(90);
-			}),
-			ctx.utils.button('✂', t('DocStudioSplitHere'), function () {
-				const pageNumber = pdfViewer.currentPageNumber;
-				if (order.indexOf(pageNumber) < order.length - 1) {
-					toggleCut(pageNumber);
-				}
-			})
-		);
+		const palette = document.createElement('nav');
+		palette.className = 'ds-palette';
+		palette.setAttribute('aria-label', t('DocStudioTools'));
+		root.insertBefore(palette, wrap);
+
+		/**
+		 * @param {Object} def Tool
+		 * @returns {string} tooltip with the shortcut
+		 */
+		function tipOf(def) {
+			return def.label + ' (' + def.key.toUpperCase() + ')';
+		}
+
+		function closeFlyout() {
+			if (flyout) {
+				flyout.remove();
+				flyout = null;
+			}
+		}
+
+		/**
+		 * List of the tools of a group, next to its button
+		 * @param {string} group
+		 * @param {HTMLElement} anchor
+		 */
+		function openFlyout(group, anchor) {
+			closeFlyout();
+			flyout = document.createElement('div');
+			flyout.className = 'ds-flyout';
+			flyout.setAttribute('role', 'menu');
+			tools.filter(function (x) {
+				return x.group === group;
+			}).forEach(function (def) {
+				const item = document.createElement('button');
+				item.type = 'button';
+				item.className = 'ds-flyout-item' + (def.code === tool ? ' docstudio-active' : '');
+				item.setAttribute('role', 'menuitem');
+				const label = document.createElement('span');
+				label.textContent = def.label;
+				const key = document.createElement('kbd');
+				key.textContent = def.key.toUpperCase();
+				item.append(icon(def.icon), label, key);
+				item.addEventListener('click', function () {
+					closeFlyout();
+					selectTool(def.code);
+				});
+				flyout.appendChild(item);
+			});
+			const box = anchor.getBoundingClientRect();
+			const rootBox = root.getBoundingClientRect();
+			flyout.style.left = (box.right - rootBox.left + 4) + 'px';
+			flyout.style.top = (box.top - rootBox.top) + 'px';
+			root.appendChild(flyout);
+			const first = flyout.querySelector('.docstudio-active') || flyout.querySelector('button');
+			if (first) {
+				first.focus();
+			}
+		}
+		document.addEventListener('pointerdown', function (e) {
+			if (flyout && !flyout.contains(e.target) && !e.target.closest('.ds-group-more')) {
+				closeFlyout();
+			}
+		});
+
+		/**
+		 * @param {Object} def Tool shown by the button
+		 * @param {string} slot Tool code or group
+		 */
+		function paletteButton(def, slot) {
+			const btn = document.createElement('button');
+			btn.type = 'button';
+			btn.className = 'ds-palette-button';
+			btn.title = tipOf(def);
+			btn.setAttribute('aria-label', def.label);
+			btn.appendChild(icon(def.icon));
+			btn.addEventListener('click', function () {
+				selectTool(def.group ? groupCurrent[def.group] : def.code);
+			});
+			if (def.group) {
+				const more = document.createElement('span');
+				more.className = 'ds-group-more';
+				more.title = t('DocStudioMoreTools');
+				more.addEventListener('click', function (e) {
+					e.stopPropagation();
+					openFlyout(def.group, btn);
+				});
+				btn.appendChild(more);
+				// Right click or long press opens the group too
+				btn.addEventListener('contextmenu', function (e) {
+					e.preventDefault();
+					openFlyout(def.group, btn);
+				});
+				let pressTimer = null;
+				btn.addEventListener('pointerdown', function () {
+					pressTimer = window.setTimeout(function () {
+						openFlyout(def.group, btn);
+					}, 500);
+				});
+				['pointerup', 'pointerleave'].forEach(function (name) {
+					btn.addEventListener(name, function () {
+						window.clearTimeout(pressTimer);
+					});
+				});
+			}
+			slotButtons[slot] = btn;
+			palette.appendChild(btn);
+		}
+
+		/**
+		 * @param {string} name Icon
+		 * @param {string} label
+		 * @param {function} onClick
+		 */
+		function actionButton(name, label, onClick) {
+			const btn = document.createElement('button');
+			btn.type = 'button';
+			btn.className = 'ds-palette-button';
+			btn.title = label;
+			btn.setAttribute('aria-label', label);
+			btn.appendChild(icon(name));
+			btn.addEventListener('click', onClick);
+			palette.appendChild(btn);
+		}
+
+		const seenGroups = new Set();
+		tools.forEach(function (def) {
+			if (!def.group) {
+				paletteButton(def, def.code);
+			} else if (!seenGroups.has(def.group)) {
+				seenGroups.add(def.group);
+				paletteButton(toolOf(groupCurrent[def.group]), def.group);
+			}
+		});
+		const paletteSeparator = document.createElement('span');
+		paletteSeparator.className = 'ds-palette-separator';
+		palette.appendChild(paletteSeparator);
+		actionButton('rotate-left', t('DocStudioRotateLeft'), function () {
+			rotateCurrentPage(-90);
+		});
+		actionButton('rotate-right', t('DocStudioRotateRight'), function () {
+			rotateCurrentPage(90);
+		});
+		actionButton('split', t('DocStudioSplitHere'), function () {
+			const pageNumber = pdfViewer.currentPageNumber;
+			if (order.indexOf(pageNumber) < order.length - 1) {
+				toggleCut(pageNumber);
+			}
+		});
+		actionButton('delete', t('DocStudioDeletePage'), function () {
+			const pageNumber = pdfViewer.currentPageNumber;
+			if (deleted.has(pageNumber)) {
+				deleted.delete(pageNumber);
+			} else if (deleted.size < pageCount - 1) {
+				deleted.add(pageNumber);
+			}
+			setDirty();
+			refreshThumb(pageNumber);
+		});
+
+		/* Options of the tool (top bar) */
+
+		const toolName = document.createElement('span');
+		toolName.className = 'ds-toolname';
+
+		/**
+		 * @param {string} text
+		 * @param {HTMLElement} input
+		 * @returns {HTMLLabelElement}
+		 */
+		function labeled(text, input) {
+			const label = document.createElement('label');
+			label.className = 'ds-option';
+			label.append(document.createTextNode(text + ' '), input);
+			return label;
+		}
 
 		const fontSelect = document.createElement('select');
 		fontSelect.className = 'ds-font';
-		fontSelect.title = t('DocStudioFont');
 		fonts.forEach(function (f) {
 			const option = document.createElement('option');
 			option.value = f.key;
 			option.textContent = f.label;
 			fontSelect.appendChild(option);
 		});
+		const fontLabel = labeled(t('DocStudioFont'), fontSelect);
 		const boldLabel = document.createElement('label');
-		boldLabel.className = 'docstudio-check ds-bold';
+		boldLabel.className = 'docstudio-check ds-option';
 		const boldBox = document.createElement('input');
 		boldBox.type = 'checkbox';
 		boldLabel.append(boldBox, document.createTextNode(' ' + t('DocStudioBold')));
 		const color = document.createElement('input');
 		color.type = 'color';
 		color.value = '#1f2328';
-		color.title = t('DocStudioColor');
 		color.className = 'ds-color';
+		const colorLabel = labeled(t('DocStudioColor'), color);
 		const size = document.createElement('input');
 		size.type = 'number';
 		size.min = '1';
 		size.max = '96';
 		size.value = '12';
-		size.title = t('DocStudioSize');
 		size.className = 'ds-size';
-		const highlightMode = document.createElement('select');
-		highlightMode.className = 'ds-font';
-		highlightMode.title = t('DocStudioHighlightMode');
-		[['free', t('DocStudioHighlightFree')], ['line', t('DocStudioHighlightLine')]].forEach(function (pair) {
-			const option = document.createElement('option');
-			option.value = pair[0];
-			option.textContent = pair[1];
-			highlightMode.appendChild(option);
-		});
+		const sizeLabel = labeled(t('DocStudioSize'), size);
 		const cropAllLabel = document.createElement('label');
-		cropAllLabel.className = 'docstudio-check';
+		cropAllLabel.className = 'docstudio-check ds-option';
 		const cropAllBox = document.createElement('input');
 		cropAllBox.type = 'checkbox';
 		cropAllBox.addEventListener('change', function () {
@@ -873,7 +1045,7 @@ window.DocStudio.registerViewer('pdfedit', {
 			redrawAll();
 		});
 		cropAllLabel.append(cropAllBox, document.createTextNode(' ' + t('DocStudioCropAll')));
-		const undoZone = ctx.utils.button('↶', t('DocStudioUndoZone'), function () {
+		const undoZone = ctx.utils.button(t('DocStudioUndoZone'), t('DocStudioUndoZone'), function () {
 			const last = objects.filter(function (o) {
 				return o.kind === TOOL_REDACT || o.kind === TOOL_CROP || o.kind === 'line';
 			}).pop();
@@ -881,6 +1053,11 @@ window.DocStudio.registerViewer('pdfedit', {
 				removeObject(last);
 			}
 		});
+		const imageButton = ctx.utils.button(t('DocStudioChooseImage'), t('DocStudioChooseImage'), function () {
+			eventBus.dispatch('switchannotationeditorparams', { source: null, type: pdfjsLib.AnnotationEditorParamsType.CREATE, value: null });
+		});
+		const hint = document.createElement('span');
+		hint.className = 'docstudio-pageinfo ds-hint';
 
 		function syncBold() {
 			const font = fontOf(fontSelect.value);
@@ -896,7 +1073,7 @@ window.DocStudio.registerViewer('pdfedit', {
 			if (tool === TOOL_DRAW) {
 				eventBus.dispatch('switchannotationeditorparams', { source: null, type: P.INK_COLOR, value: color.value });
 				eventBus.dispatch('switchannotationeditorparams', { source: null, type: P.INK_THICKNESS, value: Math.min(20, Number(size.value)) });
-			} else if (tool === TOOL_HIGHLIGHT && !highlightStraight) {
+			} else if (tool === TOOL_HIGHLIGHT) {
 				eventBus.dispatch('switchannotationeditorparams', { source: null, type: P.HIGHLIGHT_COLOR, value: color.value });
 			}
 		}
@@ -915,28 +1092,31 @@ window.DocStudio.registerViewer('pdfedit', {
 				onParamsChange();
 			});
 		});
-		highlightMode.addEventListener('change', function () {
-			highlightStraight = highlightMode.value === 'line';
-			selectTool(TOOL_HIGHLIGHT);
-		});
+
+		const hints = {};
+		hints[TOOL_NONE] = t('DocStudioHintSelect');
+		hints[TOOL_TEXT] = t('DocStudioHintText');
+		hints[TOOL_DRAW] = t('DocStudioHintDraw');
+		hints[TOOL_HIGHLIGHT] = t('DocStudioHintHighlight');
+		hints[TOOL_LINE] = t('DocStudioHintLine');
 
 		function showParams() {
+			const def = toolOf(tool);
 			const textParams = tool === TOOL_TEXT || (tool === TOOL_NONE && selectedText !== null);
-			fontSelect.hidden = !textParams;
+			toolName.replaceChildren(icon(def.icon), document.createTextNode(' ' + def.label));
+			fontLabel.hidden = !textParams;
 			boldLabel.hidden = !textParams;
-			color.hidden = !(textParams || tool === TOOL_DRAW || tool === TOOL_HIGHLIGHT);
-			size.hidden = !(textParams || tool === TOOL_DRAW || (tool === TOOL_HIGHLIGHT && highlightStraight));
-			highlightMode.hidden = tool !== TOOL_HIGHLIGHT;
+			colorLabel.hidden = !(textParams || [TOOL_DRAW, TOOL_HIGHLIGHT, TOOL_LINE].includes(tool));
+			sizeLabel.hidden = !(textParams || tool === TOOL_DRAW || tool === TOOL_LINE);
 			cropAllLabel.hidden = tool !== TOOL_CROP;
-			undoZone.hidden = !(tool === TOOL_REDACT || tool === TOOL_CROP || (tool === TOOL_HIGHLIGHT && highlightStraight));
+			undoZone.hidden = ![TOOL_REDACT, TOOL_CROP, TOOL_LINE].includes(tool);
+			imageButton.hidden = tool !== TOOL_IMAGE;
+			hint.textContent = textParams && tool === TOOL_NONE ? '' : (hints[tool] || '');
 		}
 
 		/** Editor of pdf.js matching the current tool (none for the tools of DocStudio) */
 		function applyEditorMode() {
-			const def = tools.find(function (x) {
-				return x.code === tool;
-			});
-			const mode = (tool === TOOL_HIGHLIGHT && highlightStraight) ? pdfjsLib.AnnotationEditorType.NONE : def.mode;
+			const mode = toolOf(tool).mode;
 			try {
 				if (pdfViewer.annotationEditorMode !== mode) {
 					pdfViewer.annotationEditorMode = { mode: mode };
@@ -947,18 +1127,27 @@ window.DocStudio.registerViewer('pdfedit', {
 		}
 
 		function selectTool(code) {
+			const def = toolOf(code);
 			const previous = tool;
 			tool = code;
-			Object.keys(toolButtons).forEach(function (key) {
-				toolButtons[key].classList.toggle('docstudio-active', key === code);
-				toolButtons[key].setAttribute('aria-pressed', key === code ? 'true' : 'false');
+			if (def.group) {
+				groupCurrent[def.group] = code;
+				const btn = slotButtons[def.group];
+				btn.replaceChild(icon(def.icon), btn.querySelector('svg'));
+				btn.title = tipOf(def);
+				btn.setAttribute('aria-label', def.label);
+			}
+			Object.keys(slotButtons).forEach(function (slot) {
+				const active = slot === code || (!!def.group && slot === def.group);
+				slotButtons[slot].classList.toggle('docstudio-active', active);
+				slotButtons[slot].setAttribute('aria-pressed', active ? 'true' : 'false');
 			});
 			applyEditorMode();
 			if (code !== TOOL_TEXT && code !== TOOL_NONE) {
 				selectedText = null;
 			}
 			if (previous !== code) {
-				if (code === TOOL_HIGHLIGHT) {
+				if (code === TOOL_HIGHLIGHT || code === TOOL_LINE) {
 					color.value = '#ffd400';
 					size.value = '12';
 				} else if (code === TOOL_DRAW) {
@@ -972,7 +1161,7 @@ window.DocStudio.registerViewer('pdfedit', {
 			showParams();
 			window.setTimeout(function () {
 				dispatchParams();
-				if (code === TOOL_IMAGE) {
+				if (code === TOOL_IMAGE && previous !== TOOL_IMAGE) {
 					// Opens the choice of the image file
 					eventBus.dispatch('switchannotationeditorparams', { source: null, type: pdfjsLib.AnnotationEditorParamsType.CREATE, value: null });
 				}
@@ -980,16 +1169,27 @@ window.DocStudio.registerViewer('pdfedit', {
 			redrawAll();
 		}
 
-		tools.forEach(function (def) {
-			const btn = ctx.utils.button(def.label, def.label, function () {
-				selectTool(def.code);
+		// Shortcuts of the tools (not while typing)
+		document.addEventListener('keydown', function (e) {
+			if (e.key === 'Escape') {
+				closeFlyout();
+				return;
+			}
+			const active = document.activeElement;
+			if (e.ctrlKey || e.metaKey || e.altKey || (active && (active.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(active.tagName)))
+				|| (active && active.closest && active.closest('.annotationEditorLayer'))) {
+				return;
+			}
+			const def = tools.find(function (x) {
+				return x.key === e.key.toLowerCase();
 			});
-			toolButtons[def.code] = btn;
-			toolGroup.appendChild(btn);
+			if (def) {
+				e.preventDefault();
+				selectTool(def.code);
+			}
 		});
-		const separator = document.createElement('span');
-		separator.className = 'ds-separator';
-		ctx.toolbar.append(toolGroup, separator, pageGroup, fontSelect, boldLabel, size, color, highlightMode, cropAllLabel, undoZone);
+
+		ctx.toolbar.append(toolName, fontLabel, boldLabel, sizeLabel, colorLabel, cropAllLabel, imageButton, undoZone, hint);
 		syncBold();
 
 		setDocument(pdfDocument);
