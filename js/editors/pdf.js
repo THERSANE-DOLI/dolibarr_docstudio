@@ -145,6 +145,30 @@ window.DocStudio.registerViewer('pdfedit', {
 			linkService.setDocument(doc, null);
 		}
 
+		/**
+		 * Show another content in the editor (after a rotation, or to come back after a failed saving).
+		 * The page counter of pdf.js is shared by every PDF opened in the page: the viewer is emptied and the old
+		 * document closed BEFORE the new one is opened, else the new one would see no page.
+		 * @param {Uint8Array} bytes
+		 */
+		async function reloadDocument(bytes) {
+			const state = { page: pdfViewer.currentPageNumber, scale: pdfViewer.currentScale };
+			const old = pdfDocument;
+			pdfViewer.setDocument(null);
+			linkService.setDocument(null, null);
+			await old.destroy();
+			const doc = await pdfjsLib.getDocument(Object.assign({ data: bytes, password: password || undefined }, docOptions)).promise;
+			restore = state;
+			setDocument(doc);
+		}
+
+		// The editors of pdf.js are ready only after the pages: the mode of the current tool is applied then
+		eventBus.on('annotationeditoruimanager', function () {
+			window.setTimeout(function () {
+				applyEditorMode();
+			}, 0);
+		});
+
 		function setDirty() {
 			if (!dirty) {
 				dirty = true;
@@ -687,7 +711,9 @@ window.DocStudio.registerViewer('pdfedit', {
 			image.className = 'ds-thumb-image';
 			image.title = t('DocStudioPage', pageNumber, pageCount);
 			image.addEventListener('click', function () {
-				pdfViewer.currentPageNumber = pageNumber;
+				if (pageNumber <= pdfViewer.pagesCount) {
+					pdfViewer.currentPageNumber = pageNumber;
+				}
 			});
 			const bar = document.createElement('div');
 			bar.className = 'ds-thumb-bar';
@@ -740,6 +766,7 @@ window.DocStudio.registerViewer('pdfedit', {
 		/* Rotation: applied at once to the document (visible everywhere), the annotations are kept */
 
 		let busy = false;
+		let lastAnnotated = null;
 
 		/**
 		 * @param {number} delta 90 or -90
@@ -756,11 +783,7 @@ window.DocStudio.registerViewer('pdfedit', {
 				const page = doc.getPage(pageNumber - 1);
 				page.setRotation(PDFLib.degrees((page.getRotation().angle + delta + 360) % 360));
 				const rotated = await doc.save();
-				const newDoc = await pdfjsLib.getDocument(Object.assign({ data: rotated, password: password || undefined }, docOptions)).promise;
-				const old = pdfDocument;
-				restore = { page: pageNumber, scale: pdfViewer.currentScale };
-				setDocument(newDoc);
-				old.destroy();
+				await reloadDocument(rotated);
 				setDirty();
 				drawThumbs([pageNumber]);
 			} catch (e) {
@@ -908,22 +931,29 @@ window.DocStudio.registerViewer('pdfedit', {
 			undoZone.hidden = !(tool === TOOL_REDACT || tool === TOOL_CROP || (tool === TOOL_HIGHLIGHT && highlightStraight));
 		}
 
-		function selectTool(code) {
+		/** Editor of pdf.js matching the current tool (none for the tools of DocStudio) */
+		function applyEditorMode() {
 			const def = tools.find(function (x) {
-				return x.code === code;
+				return x.code === tool;
 			});
+			const mode = (tool === TOOL_HIGHLIGHT && highlightStraight) ? pdfjsLib.AnnotationEditorType.NONE : def.mode;
+			try {
+				if (pdfViewer.annotationEditorMode !== mode) {
+					pdfViewer.annotationEditorMode = { mode: mode };
+				}
+			} catch (e) {
+				// Editors not ready yet: applied by the event annotationeditoruimanager
+			}
+		}
+
+		function selectTool(code) {
 			const previous = tool;
 			tool = code;
 			Object.keys(toolButtons).forEach(function (key) {
 				toolButtons[key].classList.toggle('docstudio-active', key === code);
 				toolButtons[key].setAttribute('aria-pressed', key === code ? 'true' : 'false');
 			});
-			const mode = (code === TOOL_HIGHLIGHT && highlightStraight) ? pdfjsLib.AnnotationEditorType.NONE : def.mode;
-			try {
-				pdfViewer.annotationEditorMode = { mode: mode };
-			} catch (e) {
-				console.error(e);
-			}
+			applyEditorMode();
 			if (code !== TOOL_TEXT && code !== TOOL_NONE) {
 				selectedText = null;
 			}
@@ -1150,7 +1180,10 @@ window.DocStudio.registerViewer('pdfedit', {
 		 */
 		async function buildPdf(progress) {
 			progress(t('DocStudioPreparing'));
+			// Read from the document shown, before any other PDF is opened (shared page counter of pdf.js)
+			const secrets = await textsUnderRedaction();
 			const annotated = await pdfDocument.saveDocument();
+			lastAnnotated = annotated.slice(0);
 			let src;
 			try {
 				src = await PDFLib.PDFDocument.load(annotated, { updateMetadata: false });
@@ -1245,7 +1278,7 @@ window.DocStudio.registerViewer('pdfedit', {
 			const bytes = await out.save({ useObjectStreams: true });
 			if (redactPages.size) {
 				progress(t('DocStudioPreparing'));
-				await checkRedaction(bytes, await textsUnderRedaction());
+				await checkRedaction(bytes, secrets);
 			}
 			return { bytes: bytes, redacted: redactPages.size > 0 };
 		}
@@ -1459,6 +1492,9 @@ window.DocStudio.registerViewer('pdfedit', {
 					} else {
 						status.textContent = (result.error || t('DocStudioErrorSave')) + (saved.length ? ' ' + t('DocStudioPartsSaved', saved.join(', ')) : '');
 					}
+					if (lastAnnotated) {
+						await reloadDocument(lastAnnotated);
+					}
 					return;
 				}
 				dirty = false;
@@ -1466,6 +1502,14 @@ window.DocStudio.registerViewer('pdfedit', {
 			} catch (e) {
 				console.error(e);
 				status.textContent = (e && e.message) ? e.message : t('DocStudioErrorSave');
+				// Other PDFs were opened to build the file: the document shown is opened again, with the annotations
+				if (lastAnnotated) {
+					try {
+						await reloadDocument(lastAnnotated);
+					} catch (e2) {
+						console.error(e2);
+					}
+				}
 			} finally {
 				saving = false;
 				confirm.disabled = false;

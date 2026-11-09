@@ -2,6 +2,11 @@
 
 ## 0.4
 
+- FIX: PDF editor, rotating a page emptied the editor (no page, tools inactive) :   0.4.1
+  - the page counter of pdf.js is shared by every PDF opened: the old document is now closed before the rotated one
+    is opened; the editor comes back to the document shown after a failed saving
+  - mode of the current tool applied once the editors of pdf.js are ready
+
 - NEW: PDF editor, texts with fonts, straight highlight, rotation and split in the toolbar :   0.4.0
   - texts of DocStudio instead of the text tool of pdf.js: movable by their handle, editable until saving,
     font, size, color and bold for the new text and the selected one, plain text only, written in the pages
