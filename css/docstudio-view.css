@@ -736,34 +736,61 @@ body {
 	border-top-color: #b42318;
 }
 
-/* Active page: the one the page actions apply to */
-/* Active page: deeper shadow only, the outline is kept for the preview of the page actions */
+/* Active page: the one the page actions apply to. Deeper shadow, never animated by the preview */
 .ds-edit-viewer .pdfViewer .page {
-	transition: box-shadow 0.2s;
+	transition: box-shadow 0.2s ease-out;
+}
+
+.ds-edit-viewer .pdfViewer .page {
+	box-shadow: 0 1px 3px rgba(15, 30, 55, 0.12);
 }
 
 .ds-edit-viewer .pdfViewer .page.ds-page-active {
-	box-shadow: 0 8px 28px rgba(15, 30, 55, 0.35), 0 2px 6px rgba(15, 30, 55, 0.2);
+	box-shadow: 0 10px 30px rgba(15, 30, 55, 0.22);
 }
 
-.ds-edit-viewer .pdfViewer .page.ds-page-target {
-	outline: 4px solid var(--ds-accent);
-	box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.08), 0 6px 24px rgba(38, 60, 92, 0.35);
+/* Preview of a page action (mouse or focus on rotate / delete): frame and badge fade in, nothing else moves */
+.ds-page-frame {
+	position: absolute;
+	inset: 0;
+	z-index: 45;
+	border: 3px solid var(--ds-accent);
+	border-radius: 2px;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.15s ease-out;
 }
 
 .ds-page-badge {
 	position: absolute;
-	top: 14px;
+	top: 12px;
 	left: 50%;
 	transform: translateX(-50%);
-	z-index: 45;
 	padding: 4px 12px;
 	border-radius: 12px;
 	background: var(--ds-accent);
 	color: #ffffff;
 	font-weight: 600;
 	font-size: 13px;
-	pointer-events: none;
+	white-space: nowrap;
+}
+
+.ds-edit-viewer .pdfViewer .page.ds-page-target .ds-page-frame {
+	opacity: 1;
+}
+
+.ds-page-actions {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.ds-edit-viewer .pdfViewer .page,
+	.ds-page-frame {
+		transition: none;
+	}
 }
 
 .ds-thumb.ds-thumb-active {
@@ -781,7 +808,9 @@ body {
 
 /* More space between the pages of the editor, with the scissors in it */
 .ds-edit-viewer .pdfViewer {
-	--page-margin: 1px auto 36px;
+	--page-margin: 12px auto 36px;
+	/* No transparent border around the pages: the shadow hugs the page instead of drawing a frame 9px away */
+	--page-border: 0 solid transparent;
 }
 
 .ds-page-cut {

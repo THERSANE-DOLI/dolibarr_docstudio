@@ -2,6 +2,12 @@
 
 ## 0.7
 
+- FIX: PDF editor, shadow of the page flashing when the mouse is on the page actions, grey frame around the pages :   0.7.2
+  - the preview no longer animates the shadow (a huge spread was animated): a frame and a badge fade in (opacity
+    only, 150 ms), nothing else moves; no animation with « reduce motion »
+  - the 3 page actions are one group: moving from one to the other keeps the preview on
+  - no transparent border around the pages: the shadow hugs the page, outline only in the preview
+
 - FIX: PDF editor, active page marked by a deeper shadow only, without outline :   0.7.1
   - the outline stays for the preview of the page actions (mouse on rotate or delete)
 

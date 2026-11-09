@@ -837,19 +837,20 @@ window.DocStudio.registerViewer('pdfedit', {
 			for (let i = 1; i <= pdfDocument.numPages; i++) {
 				const pageView = pdfViewer.getPageView(i - 1);
 				if (pageView && pageView.div) {
+					// Frame and badge always there, only their opacity changes (no flash, no layout change)
+					let frame = pageView.div.querySelector(':scope > .ds-page-frame');
+					if (!frame) {
+						frame = document.createElement('div');
+						frame.className = 'ds-page-frame';
+						frame.setAttribute('aria-hidden', 'true');
+						const badge = document.createElement('span');
+						badge.className = 'ds-page-badge';
+						frame.appendChild(badge);
+						pageView.div.appendChild(frame);
+					}
+					frame.firstChild.textContent = t('DocStudioPage', i, pdfDocument.numPages);
 					pageView.div.classList.toggle('ds-page-active', i === activePage);
 					pageView.div.classList.toggle('ds-page-target', i === activePage && targetShown);
-					let badge = pageView.div.querySelector(':scope > .ds-page-badge');
-					if (i === activePage && targetShown) {
-						if (!badge) {
-							badge = document.createElement('div');
-							badge.className = 'ds-page-badge';
-							pageView.div.appendChild(badge);
-						}
-						badge.textContent = t('DocStudioPage', activePage, pdfDocument.numPages);
-					} else if (badge) {
-						badge.remove();
-					}
 				}
 			}
 			Object.keys(thumbs).forEach(function (key) {
@@ -875,8 +876,10 @@ window.DocStudio.registerViewer('pdfedit', {
 		 * @param {boolean} shown Show which page the action will change
 		 */
 		function showTarget(shown) {
-			targetShown = shown;
-			applyActive();
+			if (targetShown !== shown) {
+				targetShown = shown;
+				applyActive();
+			}
 		}
 
 		eventBus.on('pagechanging', function (e) {
@@ -1121,19 +1124,24 @@ window.DocStudio.registerViewer('pdfedit', {
 				btn.setAttribute('aria-label', btn.title);
 			});
 		};
-		[rotateLeftButton, rotateRightButton, deleteButton].forEach(function (btn) {
-			btn.addEventListener('mouseenter', function () {
-				showTarget(true);
-			});
-			btn.addEventListener('mouseleave', function () {
+		// The 3 buttons in one group: moving from one to the other keeps the preview on, without blinking
+		const pageActions = document.createElement('div');
+		pageActions.className = 'ds-page-actions';
+		palette.insertBefore(pageActions, rotateLeftButton);
+		pageActions.append(rotateLeftButton, rotateRightButton, deleteButton);
+		pageActions.addEventListener('pointerenter', function () {
+			showTarget(true);
+		});
+		pageActions.addEventListener('pointerleave', function () {
+			showTarget(false);
+		});
+		pageActions.addEventListener('focusin', function () {
+			showTarget(true);
+		});
+		pageActions.addEventListener('focusout', function (e) {
+			if (!pageActions.contains(e.relatedTarget)) {
 				showTarget(false);
-			});
-			btn.addEventListener('focus', function () {
-				showTarget(true);
-			});
-			btn.addEventListener('blur', function () {
-				showTarget(false);
-			});
+			}
 		});
 
 		/* Options of the tool (top bar) */
