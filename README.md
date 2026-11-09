@@ -1,0 +1,79 @@
+# DocStudio for [Dolibarr ERP & CRM](https://www.dolibarr.org)
+
+View the documents of Dolibarr without leaving it.
+
+## Features
+
+- « Open with DocStudio » link next to the files of the Documents tabs, of the Documents block of the cards and of
+  the ECM: the file opens in a dialog (Ctrl+click: in a new tab).
+- Built-in viewers, nothing else to install:
+  - PDF (pdf.js, embedded: pages, text selection, zoom);
+  - images (PNG, JPEG, GIF, WebP, BMP, AVIF, SVG);
+  - CSV and TSV as a sortable table;
+  - text files (TXT, LOG, JSON, XML, HTML source, EML source...).
+- Same permissions as the download: a user who cannot download a file cannot view it.
+- Other modules can add viewers for other file types, and sources of files other than the documents of Dolibarr.
+
+## Security
+
+- Every request checks the permissions again on the server, like `document.php` (`dol_check_secure_access_document()`).
+- Paths with `..`, absolute paths, hidden files and files outside of the data directory are refused.
+- External users need the permission « View the documents of their own thirdparty with DocStudio », and only see
+  the documents of their own thirdparty (documents without a known owner, like the ECM, are refused to them).
+- The content of a file is always sent as a download of unknown type with a sandbox policy: opening its URL directly
+  never runs it. It can only be read by a page of the same site.
+- The viewer page has a strict Content Security Policy: no request outside of Dolibarr, nothing from the file can run
+  (no JavaScript of PDF files, no XFA forms, no active links, SVG shown as an image only, text never rendered as HTML).
+
+## For developers
+
+Declare a viewer in the hook `docstudioRegisterViewers` (context `docstudio`), `$object` being the registry:
+
+```php
+public function docstudioRegisterViewers($parameters, &$object, &$action, $hookmanager)
+{
+	$object->registerViewer(array(
+		'code' => 'mymodule_dwg',
+		'label' => $langs->trans('MyViewer'),
+		'extensions' => array('dwg'),
+		'script' => '/mymodule/js/dwgviewer.js',	// JavaScript module
+		'priority' => 60,
+	));
+	return 0;
+}
+```
+
+then register its implementation in the script:
+
+```js
+window.DocStudio.registerViewer('mymodule_dwg', {
+	async mount(ctx) {
+		const buffer = await ctx.file.arrayBuffer();
+		// ... fill ctx.container with DOM methods (never innerHTML with content of the file)
+		return { unmount() {} };
+	}
+});
+```
+
+Sources of files: hook `docstudioRegisterProviders`, `$object->registerProvider('code', 'MyProviderClass', '/mymodule/class/myprovider.class.php')`
+with a class extending `DocStudioFileProvider` (see its documentation: the provider checks the permissions in `load()`).
+
+JavaScript hooks (when the JavaScript context of Dolibarr is available, Dolibarr 24 or module BackportDolContext):
+
+- `await Dolibarr.executeHookAwait('docstudio:beforeOpen', ctx)`: change `ctx.viewer` (among `ctx.viewers`) or set
+  `ctx.cancel = true` and `ctx.reason`;
+- `Dolibarr.executeHook('docstudio:opened', {source, file, viewer})`.
+
+## Requirements
+
+Dolibarr 23 or more, PHP 7.4 or more.
+
+## Licenses
+
+### Main code
+
+GPLv3 or (at your option) any later version. See file COPYING for more information.
+
+### Embedded libraries
+
+- pdf.js 5.4.624 (Mozilla, Apache 2.0), in `vendor/pdfjs`.

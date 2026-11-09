@@ -1,0 +1,319 @@
+/* Copyright (C) 2026		John BOTELLA				<john.botella@thersane.fr>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/* Viewer page of DocStudio */
+
+:root {
+	--ds-bg: #e8eaed;
+	--ds-surface: #ffffff;
+	--ds-text: #1f2328;
+	--ds-muted: #5f6b7a;
+	--ds-border: #d0d7de;
+	--ds-accent: #263c5c;
+	--ds-error: #b42318;
+	--ds-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+	color-scheme: light;
+}
+
+:root[data-darkmode="1"] {
+	--ds-bg: #1b1d21;
+	--ds-surface: #26292e;
+	--ds-text: #e6e8eb;
+	--ds-muted: #a0a8b3;
+	--ds-border: #3a3f46;
+	--ds-accent: #8fb3e8;
+	--ds-error: #ff8a80;
+	--ds-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+	color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root[data-darkmode="2"] {
+		--ds-bg: #1b1d21;
+		--ds-surface: #26292e;
+		--ds-text: #e6e8eb;
+		--ds-muted: #a0a8b3;
+		--ds-border: #3a3f46;
+		--ds-accent: #8fb3e8;
+		--ds-error: #ff8a80;
+		--ds-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+		color-scheme: dark;
+	}
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html, body {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	display: flex;
+	flex-direction: column;
+	background: var(--ds-bg);
+	color: var(--ds-text);
+	font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+	font-size: 14px;
+}
+
+.docstudio-toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 12px;
+	padding: 6px 12px;
+	background: var(--ds-surface);
+	border-bottom: 1px solid var(--ds-border);
+	min-height: 44px;
+}
+
+.docstudio-filename {
+	font-weight: 600;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 40ch;
+}
+
+.docstudio-tools {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex: 1 1 auto;
+	flex-wrap: wrap;
+}
+
+.docstudio-button,
+.docstudio-openwith select {
+	font: inherit;
+	color: var(--ds-text);
+	background: var(--ds-surface);
+	border: 1px solid var(--ds-border);
+	border-radius: 4px;
+	padding: 4px 10px;
+	min-height: 30px;
+	cursor: pointer;
+	text-decoration: none;
+	display: inline-flex;
+	align-items: center;
+}
+
+.docstudio-button:hover,
+.docstudio-button:focus-visible {
+	border-color: var(--ds-accent);
+	outline: none;
+}
+
+.docstudio-openwith {
+	color: var(--ds-muted);
+}
+
+.docstudio-pageinfo,
+.docstudio-check {
+	color: var(--ds-muted);
+	white-space: nowrap;
+}
+
+.docstudio-main {
+	flex: 1 1 auto;
+	overflow: auto;
+	position: relative;
+	outline: none;
+}
+
+.docstudio-message {
+	margin: 40px auto;
+	max-width: 600px;
+	padding: 16px;
+	text-align: center;
+	color: var(--ds-muted);
+}
+
+.docstudio-error {
+	color: var(--ds-error);
+}
+
+.docstudio-container {
+	min-height: 100%;
+}
+
+/* PDF */
+.docstudio-pdf-pages {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	padding: 16px;
+}
+
+.docstudio-pdf-page {
+	position: relative;
+	background: #ffffff;
+	box-shadow: var(--ds-shadow);
+	flex: 0 0 auto;
+}
+
+.docstudio-pdf-page canvas {
+	display: block;
+}
+
+/* Text layer of pdf.js (from pdf_viewer.css of pdfjs-dist, Apache 2.0) */
+.textLayer {
+	color-scheme: only light;
+	position: absolute;
+	text-align: initial;
+	inset: 0;
+	overflow: clip;
+	opacity: 1;
+	line-height: 1;
+	text-size-adjust: none;
+	forced-color-adjust: none;
+	transform-origin: 0 0;
+	caret-color: CanvasText;
+	z-index: 0;
+	--min-font-size: 1;
+	--text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+	--min-font-size-inv: calc(1 / var(--min-font-size));
+}
+
+.textLayer :is(span, br) {
+	color: transparent;
+	position: absolute;
+	white-space: pre;
+	cursor: text;
+	transform-origin: 0% 0%;
+}
+
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+	z-index: 1;
+	--font-height: 0;
+	font-size: calc(var(--text-scale-factor) * var(--font-height));
+	--scale-x: 1;
+	--rotate: 0deg;
+	transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer .markedContent {
+	display: contents;
+}
+
+.textLayer span[role="img"] {
+	user-select: none;
+	cursor: default;
+}
+
+.textLayer ::selection {
+	background: rgba(0, 100, 255, 0.25);
+}
+
+/* Image */
+.docstudio-viewer-image .docstudio-container {
+	display: flex;
+	justify-content: center;
+	align-items: flex-start;
+	padding: 16px;
+	min-height: 100%;
+}
+
+.docstudio-image {
+	background: repeating-conic-gradient(#ddd 0% 25%, #fff 0% 50%) 50% / 16px 16px;
+	box-shadow: var(--ds-shadow);
+	cursor: zoom-in;
+}
+
+.docstudio-image.docstudio-image-fit {
+	max-width: 100%;
+	max-height: calc(100vh - 90px);
+	cursor: zoom-out;
+}
+
+/* Text */
+.docstudio-text {
+	margin: 0;
+	padding: 16px;
+	font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+	font-size: 13px;
+	line-height: 1.5;
+	tab-size: 4;
+	background: var(--ds-surface);
+	min-height: 100%;
+}
+
+.docstudio-text-wrap {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+/* CSV */
+.docstudio-table {
+	border-collapse: collapse;
+	background: var(--ds-surface);
+	margin: 16px;
+	font-size: 13px;
+}
+
+.docstudio-table th,
+.docstudio-table td {
+	border: 1px solid var(--ds-border);
+	padding: 4px 8px;
+	text-align: left;
+	vertical-align: top;
+	white-space: pre-wrap;
+	max-width: 40ch;
+}
+
+.docstudio-table th {
+	position: sticky;
+	top: 0;
+	background: var(--ds-bg);
+	cursor: pointer;
+	user-select: none;
+}
+
+.docstudio-table th[aria-sort="ascending"]::after {
+	content: " \25B2";
+}
+
+.docstudio-table th[aria-sort="descending"]::after {
+	content: " \25BC";
+}
+
+.docstudio-table tbody tr:nth-child(even) td {
+	background: color-mix(in srgb, var(--ds-bg) 35%, var(--ds-surface));
+}
+
+@media (max-width: 600px) {
+	.docstudio-filename {
+		max-width: 100%;
+		flex: 1 1 100%;
+	}
+	.docstudio-pdf-pages {
+		padding: 8px;
+	}
+}
+
+@media print {
+	.docstudio-toolbar {
+		display: none;
+	}
+	.docstudio-main {
+		overflow: visible;
+	}
+}

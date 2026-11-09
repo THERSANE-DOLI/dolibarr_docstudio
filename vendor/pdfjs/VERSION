@@ -1,0 +1,2 @@
+pdfjs-dist 5.4.624 legacy build (https://github.com/mozilla/pdf.js) - Apache 2.0
+.mjs files renamed .js so that every web server sends them with a JavaScript content type.

@@ -1,0 +1,53 @@
+# Copyright (C) 2026 John BOTELLA <john.botella@thersane.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+Module141932Name = DocStudio
+Module141932Desc = Dokumente in Dolibarr anzeigen: PDF, Bilder, Text, CSV und von anderen Modulen hinzugefügte Betrachter
+DocStudio = DocStudio
+DocStudioDescription = Dokumente in Dolibarr mit erweiterbaren Betrachtern anzeigen
+DocStudioDescriptionLong = DocStudio fügt neben den Dateien der Registerkarten Dokumente einen Link « Mit DocStudio öffnen » hinzu. Die Datei wird in einem Betrachter in Dolibarr geöffnet, mit denselben Rechten wie beim Herunterladen. PDF, Bilder, Text und CSV werden ohne weitere Software angezeigt. Andere Module können eigene Betrachter hinzufügen.
+DocStudioSetup = DocStudio-Einstellungen
+DocStudioSetupPage = Installierte Betrachter und Dateiquellen. Zum Anzeigen einer Datei ist dasselbe Recht wie zum Herunterladen nötig, sonst nichts.
+DocStudioJsContext = JavaScript-Kontext von Dolibarr (Hooks der Betrachter)
+DocStudioJsContextCore = Verfügbar (Dolibarr-Kern)
+DocStudioJsContextBackport = Verfügbar (Modul BackportDolContext)
+DocStudioJsContextMissing = Nicht verfügbar: die Betrachter funktionieren, aber andere Module können das Öffnen nicht über JavaScript-Hooks beeinflussen
+DocStudioViewers = Betrachter
+DocStudioViewer = Betrachter
+DocStudioFileTypes = Dateitypen
+DocStudioPriority = Priorität
+DocStudioProviders = Dateiquellen
+DocStudioRefusedDeclarations = Abgelehnte Deklarationen (Details im Protokoll):
+DocStudioViewerPdf = PDF
+DocStudioViewerImage = Bild
+DocStudioViewerCsv = Tabelle (CSV)
+DocStudioViewerText = Text
+DocStudioOpenWith = Öffnen mit
+DocStudioOpenWithDocStudio = Mit DocStudio öffnen
+DocStudioOpenInNewTab = In neuem Tab öffnen
+DocStudioCloseDialog = Schließen
+DocStudioLoading = Wird geladen...
+DocStudioOpeningCancelled = Öffnen abgebrochen.
+DocStudioZoomIn = Vergrößern
+DocStudioZoomOut = Verkleinern
+DocStudioZoomFit = An Breite anpassen
+DocStudioZoomActual = Originalgröße
+DocStudioPage = Seite %s / %s
+DocStudioPdfPassword = Dieses PDF ist geschützt. Passwort:
+DocStudioRows = %s Zeilen
+DocStudioRowsTruncated = Nur die ersten %s Zeilen, laden Sie die Datei herunter, um alles zu sehen
+DocStudioWrapLines = Zeilen umbrechen
+DocStudioEncoding = Kodierung: %s
+DocStudioErrorExternalUser = Externe Benutzer benötigen ein Recht, um Dokumente anzuzeigen.
+DocStudioErrorBadFileName = Ungültiger Dateiname.
+DocStudioErrorForbidden = Sie dürfen diese Datei nicht anzeigen.
+DocStudioErrorFileNotFound = Datei nicht gefunden.
+DocStudioErrorUnknownSource = Unbekannte Dateiquelle.
+DocStudioErrorNoViewer = Kein Betrachter für diesen Dateityp (oder die Datei ist zu groß). Laden Sie sie herunter, um sie zu öffnen.
+DocStudioErrorLoading = Die Datei konnte nicht geladen werden.
+DocStudioRightExternalRead = Externe Benutzer: die Dokumente ihres eigenen Geschäftspartners mit DocStudio anzeigen
+Permission14193211 = Externe Benutzer: die Dokumente ihres eigenen Geschäftspartners mit DocStudio anzeigen

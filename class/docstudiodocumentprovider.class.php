@@ -1,0 +1,265 @@
+<?php
+/* Copyright (C) 2026		John BOTELLA				<john.botella@thersane.fr>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+/**
+ * \file    htdocs/docstudio/class/docstudiodocumentprovider.class.php
+ * \ingroup docstudio
+ * \brief   File provider of the documents of Dolibarr (the files served by document.php)
+ */
+
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+dol_include_once('/docstudio/class/docstudiofileprovider.class.php');
+
+
+/**
+ * Documents of Dolibarr, identified like document.php: modulepart + file (relative path) + entity.
+ *
+ * The checks are the ones of document.php, made stricter:
+ * - permissions by dol_check_secure_access_document() in mode 'read';
+ * - external users need the permission docstudio > external > read, then see only the documents of their own
+ *   thirdparty (filter of document.php, a modulepart without this filter is refused instead of allowed);
+ * - a relative path with '..', a leading slash, a backslash, a control character or a pipe is refused, not cleaned;
+ * - the entity must be one the user may see;
+ * - the real path (symbolic links resolved) must stay inside the data directory of Dolibarr;
+ * - public links (hashp) are not supported.
+ */
+class DocStudioDocumentProvider extends DocStudioFileProvider
+{
+	/** @var string */
+	protected $modulepart = '';
+
+	/** @var string Path relative to the directory of the modulepart */
+	protected $relativeFile = '';
+
+	/** @var int */
+	protected $entity = 0;
+
+	/** @var string Full path on disk, never given outside of this class */
+	protected $fullPath = '';
+
+	/**
+	 * Request parameters that identify a file, with their GETPOST() type
+	 *
+	 * @return array<string,string>
+	 */
+	public function getRequestParams()
+	{
+		return array('modulepart' => 'aZ09', 'file' => 'alphanohtml', 'entity' => 'int');
+	}
+
+	/**
+	 * Find the file and check that the user may read it
+	 *
+	 * @param array<string,mixed> $params Values of getRequestParams()
+	 * @param User                $fuser  User asking for the file
+	 * @return int                        1 if the file may be read, 0 if not found, -1 if forbidden
+	 */
+	public function load(array $params, User $fuser)
+	{
+		global $conf, $langs;
+
+		$this->fullPath = '';
+		$this->modulepart = isset($params['modulepart']) ? (string) $params['modulepart'] : '';
+		$this->relativeFile = isset($params['file']) ? (string) $params['file'] : '';
+		$this->entity = !empty($params['entity']) ? (int) $params['entity'] : (int) $conf->entity;
+
+		if (!empty($fuser->socid) && !$fuser->hasRight('docstudio', 'external', 'read')) {
+			$this->error = $langs->trans('DocStudioErrorExternalUser');
+			return -1;
+		}
+		if (!self::isSafeRelativePath($this->relativeFile) || $this->modulepart === '') {
+			$this->error = $langs->trans('DocStudioErrorBadFileName');
+			return -1;
+		}
+		if (!$this->isEntityAllowed($this->entity)) {
+			$this->error = $langs->trans('DocStudioErrorForbidden');
+			return -1;
+		}
+
+		$check = dol_check_secure_access_document($this->modulepart, $this->relativeFile, $this->entity, $fuser, '', 'read');
+		if (!is_array($check) || empty($check['accessallowed']) || empty($check['original_file'])) {
+			$this->error = $langs->trans('DocStudioErrorForbidden');
+			return -1;
+		}
+
+		if (!empty($fuser->socid) && !$this->isOwnThirdpartyDocument($fuser, isset($check['sqlprotectagainstexternals']) ? (string) $check['sqlprotectagainstexternals'] : '')) {
+			$this->error = $langs->trans('DocStudioErrorForbidden');
+			return -1;
+		}
+
+		$path = (string) $check['original_file'];
+		if (preg_match('/\.\.|[<>|]/', $path) || !is_file($path) || !is_readable($path)) {
+			$this->error = $langs->trans('DocStudioErrorFileNotFound');
+			return 0;
+		}
+		if (!self::isInsideDataRoot($path)) {
+			dol_syslog(__METHOD__.' refused file outside of the data directory: '.$path, LOG_WARNING);
+			$this->error = $langs->trans('DocStudioErrorForbidden');
+			return -1;
+		}
+
+		$this->fullPath = $path;
+
+		return 1;
+	}
+
+	/**
+	 * Document of the thirdparty of an external user: every owner found by the query of dol_check_secure_access_document()
+	 * must be this thirdparty. Stricter than document.php: no query (modulepart without known owner) or no owner found
+	 * means refused.
+	 *
+	 * @param User   $fuser External user
+	 * @param string $sql   Query giving the thirdparties owning the document (column fk_soc)
+	 * @return bool
+	 */
+	protected function isOwnThirdpartyDocument(User $fuser, $sql)
+	{
+		if ($sql === '') {
+			return false;
+		}
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			return false;
+		}
+		$found = 0;
+		while ($obj = $this->db->fetch_object($resql)) {
+			$found++;
+			if ((int) $obj->fk_soc !== (int) $fuser->socid) {
+				$this->db->free($resql);
+				return false;
+			}
+		}
+		$this->db->free($resql);
+
+		return $found > 0;
+	}
+
+	/**
+	 * A relative path given by the browser is accepted only if it cannot leave its directory
+	 *
+	 * @param string $path Relative path
+	 * @return bool
+	 */
+	public static function isSafeRelativePath($path)
+	{
+		if ($path === '' || strlen($path) > 1024) {
+			return false;
+		}
+		// No parent directory, no absolute path, no Windows separator, no control character, no stream wrapper
+		if (preg_match('/(^|\/)\.\.(\/|$)|^\/|\\\\|[\x00-\x1F\x7F<>|]|^[a-z][a-z0-9+.-]*:/i', $path)) {
+			return false;
+		}
+		// No hidden file nor hidden directory
+		if (preg_match('/(^|\/)\./', $path)) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * The real path of a file (symbolic links resolved) is inside the data directory of Dolibarr
+	 *
+	 * @param string $path Full path
+	 * @return bool
+	 */
+	public static function isInsideDataRoot($path)
+	{
+		$root = realpath(DOL_DATA_ROOT);
+		$real = realpath($path);
+		if ($root === false || $real === false) {
+			return false;
+		}
+
+		return strpos($real, rtrim($root, '/').'/') === 0;
+	}
+
+	/**
+	 * The entity of the document is the current one, or one shared with it
+	 *
+	 * @param int $entity Entity asked
+	 * @return bool
+	 */
+	protected function isEntityAllowed($entity)
+	{
+		global $conf;
+
+		if ($entity == $conf->entity) {
+			return true;
+		}
+		if (!isModEnabled('multicompany')) {
+			return false;
+		}
+		$allowed = array_map('intval', explode(',', getEntity($this->modulepart)));
+
+		return in_array((int) $entity, $allowed, true);
+	}
+
+	/**
+	 * Name of the file as shown to the user
+	 *
+	 * @return string
+	 */
+	public function getFileName()
+	{
+		return $this->fullPath === '' ? '' : basename($this->fullPath);
+	}
+
+	/**
+	 * Size of the file in bytes
+	 *
+	 * @return int
+	 */
+	public function getSize()
+	{
+		return $this->fullPath === '' ? 0 : (int) filesize($this->fullPath);
+	}
+
+	/**
+	 * Print the raw content of the file
+	 *
+	 * @return bool
+	 */
+	public function outputContent()
+	{
+		if ($this->fullPath === '') {
+			return false;
+		}
+
+		return readfile($this->fullPath) !== false;
+	}
+
+	/**
+	 * URL of document.php for this file
+	 *
+	 * @return string
+	 */
+	public function getDownloadUrl()
+	{
+		return DOL_URL_ROOT.'/document.php?modulepart='.urlencode($this->modulepart).'&file='.urlencode($this->relativeFile).'&entity='.((int) $this->entity);
+	}
+
+	/**
+	 * Values of the request parameters of the loaded file
+	 *
+	 * @return array<string,string|int>
+	 */
+	public function getParams()
+	{
+		return array('modulepart' => $this->modulepart, 'file' => $this->relativeFile, 'entity' => $this->entity);
+	}
+}

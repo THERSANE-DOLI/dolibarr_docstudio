@@ -1,0 +1,53 @@
+# Copyright (C) 2026 John BOTELLA <john.botella@thersane.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+Module141932Name = DocStudio
+Module141932Desc = View documents in Dolibarr: PDF, images, text, CSV, and viewers added by other modules
+DocStudio = DocStudio
+DocStudioDescription = View documents in Dolibarr through pluggable viewers
+DocStudioDescriptionLong = DocStudio adds an « Open with DocStudio » link next to the files of the Documents tabs. The file opens in a viewer inside Dolibarr, with the same permissions as the download. PDF, images, text and CSV are shown without any other software. Other modules can add their own viewers.
+DocStudioSetup = DocStudio setup
+DocStudioSetupPage = Viewers and sources of files installed. Viewing a file needs the same permission as downloading it, nothing else to grant.
+DocStudioJsContext = JavaScript context of Dolibarr (hooks of the viewers)
+DocStudioJsContextCore = Available (Dolibarr core)
+DocStudioJsContextBackport = Available (module BackportDolContext)
+DocStudioJsContextMissing = Not available: viewers work, but other modules cannot change the opening with JavaScript hooks
+DocStudioViewers = Viewers
+DocStudioViewer = Viewer
+DocStudioFileTypes = File types
+DocStudioPriority = Priority
+DocStudioProviders = Sources of files
+DocStudioRefusedDeclarations = Declarations refused (details in the log):
+DocStudioViewerPdf = PDF
+DocStudioViewerImage = Image
+DocStudioViewerCsv = Table (CSV)
+DocStudioViewerText = Text
+DocStudioOpenWith = Open with
+DocStudioOpenWithDocStudio = Open with DocStudio
+DocStudioOpenInNewTab = Open in a new tab
+DocStudioCloseDialog = Close
+DocStudioLoading = Loading...
+DocStudioOpeningCancelled = Opening cancelled.
+DocStudioZoomIn = Zoom in
+DocStudioZoomOut = Zoom out
+DocStudioZoomFit = Fit to width
+DocStudioZoomActual = Actual size
+DocStudioPage = Page %s / %s
+DocStudioPdfPassword = This PDF is protected. Password:
+DocStudioRows = %s rows
+DocStudioRowsTruncated = First %s rows only, download the file to see everything
+DocStudioWrapLines = Wrap lines
+DocStudioEncoding = Encoding: %s
+DocStudioErrorExternalUser = Viewing documents needs a permission for external users.
+DocStudioErrorBadFileName = Invalid file name.
+DocStudioErrorForbidden = You are not allowed to view this file.
+DocStudioErrorFileNotFound = File not found.
+DocStudioErrorUnknownSource = Unknown source of file.
+DocStudioErrorNoViewer = No viewer for this type of file (or the file is too big). Download it to open it.
+DocStudioErrorLoading = The file could not be loaded.
+DocStudioRightExternalRead = External users: view the documents of their own thirdparty with DocStudio
+Permission14193211 = External users: view the documents of their own thirdparty with DocStudio
