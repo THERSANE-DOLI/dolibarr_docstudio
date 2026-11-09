@@ -154,7 +154,98 @@ body {
 }
 
 /* PDF */
+.docstudio-pdf-layout {
+	display: flex;
+	align-items: flex-start;
+	min-height: 100%;
+}
+
+.docstudio-pdf-thumbs {
+	position: sticky;
+	top: 0;
+	flex: 0 0 auto;
+	width: 180px;
+	max-height: calc(100vh - 46px);
+	overflow-y: auto;
+	padding: 12px 8px;
+	background: var(--ds-surface);
+	border-right: 1px solid var(--ds-border);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+}
+
+.docstudio-pdf-thumbs[hidden] {
+	display: none;
+}
+
+.docstudio-pdf-thumb {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: 4px;
+	background: none;
+	border: 2px solid transparent;
+	border-radius: 4px;
+	color: var(--ds-muted);
+	font: inherit;
+	font-size: 12px;
+	cursor: pointer;
+}
+
+.docstudio-pdf-thumb.docstudio-current,
+.docstudio-pdf-thumb:focus-visible {
+	border-color: var(--ds-accent);
+	outline: none;
+}
+
+.docstudio-pdf-thumb-image {
+	display: block;
+	background: #ffffff;
+	box-shadow: var(--ds-shadow);
+}
+
+.docstudio-pdf-thumb-image canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+.docstudio-search {
+	font: inherit;
+	color: var(--ds-text);
+	background: var(--ds-surface);
+	border: 1px solid var(--ds-border);
+	border-radius: 4px;
+	padding: 4px 8px;
+	min-height: 30px;
+	width: 16ch;
+}
+
+.docstudio-search:focus {
+	border-color: var(--ds-accent);
+	outline: none;
+}
+
+.textLayer span.docstudio-hit {
+	background: rgba(255, 200, 0, 0.45);
+	border-radius: 2px;
+}
+
+.docstudio-print {
+	display: none;
+}
+
+.docstudio-button:disabled {
+	opacity: 0.6;
+	cursor: progress;
+}
+
 .docstudio-pdf-pages {
+	flex: 1 1 auto;
+	min-width: 0;
 	display: flex;
 	flex-direction: column;
 	align-items: center;
@@ -310,10 +401,31 @@ body {
 }
 
 @media print {
-	.docstudio-toolbar {
+	/* Only the pages prepared by the PDF viewer are printed, else the content as shown */
+	body:has(.docstudio-print > img) > :not(.docstudio-print) {
+		display: none !important;
+	}
+	.docstudio-print {
+		display: block;
+	}
+	.docstudio-print img {
+		display: block;
+		width: 100%;
+		page-break-after: always;
+		break-after: page;
+	}
+	.docstudio-toolbar,
+	.docstudio-pdf-thumbs {
 		display: none;
 	}
 	.docstudio-main {
 		overflow: visible;
 	}
+	body {
+		background: #ffffff;
+	}
+}
+
+@page {
+	margin: 0;
 }

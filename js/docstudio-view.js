@@ -33,7 +33,6 @@ const allowed = (cfg.viewers || []).map(function (v) {
 	return v.code;
 });
 const fileInfo = Object.freeze({ name: cfg.file.name, extension: cfg.file.extension, size: cfg.file.size });
-const storageKey = 'docstudio-viewer-' + cfg.file.extension;
 
 let contentPromise = null;
 let current = null;
@@ -96,19 +95,14 @@ function showMessage(text, isError) {
 }
 
 /**
- * @returns {string} viewer chosen before for this extension, or the first one
+ * @returns {string} viewer asked by the link, else the one chosen for this type (administrator or user), else the first
  */
 function defaultViewer() {
 	if (cfg.viewerAsked && allowed.indexOf(cfg.viewerAsked) >= 0) {
 		return cfg.viewerAsked;
 	}
-	try {
-		const saved = window.localStorage.getItem(storageKey);
-		if (saved && allowed.indexOf(saved) >= 0) {
-			return saved;
-		}
-	} catch (e) {
-		// Storage unavailable (private window, blocked): the first viewer is used
+	if (cfg.viewerDefault && allowed.indexOf(cfg.viewerDefault) >= 0) {
+		return cfg.viewerDefault;
 	}
 	return allowed[0];
 }
@@ -180,12 +174,8 @@ async function open(code) {
 }
 
 if (select) {
+	// One time choice: the lasting choice belongs to the administrator (and to the user when allowed, on the user card)
 	select.addEventListener('change', function () {
-		try {
-			window.localStorage.setItem(storageKey, select.value);
-		} catch (e) {
-			// Choice not remembered
-		}
 		open(select.value);
 	});
 }

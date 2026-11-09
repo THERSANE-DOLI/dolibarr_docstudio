@@ -15,8 +15,9 @@
  */
 
 /**
- * Pages of Dolibarr: adds « Open with DocStudio » next to the download links of document.php (Documents tabs,
- * Documents block of the cards, ECM) for the file types a viewer can show, and opens the viewer in a dialog.
+ * Pages of Dolibarr: lists of documents (Documents tabs, Documents block of the cards, ECM). For each file type, the
+ * handler chosen by the administrator (or by the user when allowed) opens the file: preview of Dolibarr, a viewer of
+ * DocStudio, or nothing. One magnifier per line, the one of Dolibarr when it exists.
  * The link only carries modulepart, file and entity, read from the link of Dolibarr: the viewer checks the
  * permissions again on the server. Ctrl+click or middle click opens the viewer in a new tab.
  */
@@ -33,8 +34,7 @@
 	} catch (e) {
 		return;
 	}
-	const extensions = new Set(cfg.extensions || []);
-	let dialog = null;
+	const handlers = cfg.handlers || {};
 
 	/**
 	 * @param {string} name File name or path
@@ -47,122 +47,133 @@
 	}
 
 	/**
-	 * @returns {HTMLDialogElement}
+	 * File of a link to document.php of Dolibarr itself, null for anything else (other pages, other sites, public links)
+	 * @param {HTMLAnchorElement} link
+	 * @returns {{modulepart: string, file: string, entity: string, extension: string}|null}
 	 */
-	function getDialog() {
-		if (dialog) {
-			return dialog;
+	function fileOfLink(link) {
+		let params;
+		try {
+			const url = new URL(link.getAttribute('href'), window.location.href);
+			if (url.origin !== window.location.origin || url.pathname !== cfg.documentPath) {
+				return null;
+			}
+			params = url.searchParams;
+		} catch (e) {
+			return null;
 		}
-		dialog = document.createElement('dialog');
-		dialog.className = 'docstudio-dialog';
-		dialog.setAttribute('aria-label', cfg.label);
-		const bar = document.createElement('div');
-		bar.className = 'docstudio-dialog-bar';
-		const newTab = document.createElement('a');
-		newTab.className = 'docstudio-dialog-newtab';
-		newTab.target = '_blank';
-		newTab.rel = 'noopener';
-		newTab.textContent = cfg.newTabLabel;
-		const close = document.createElement('button');
-		close.type = 'button';
-		close.className = 'docstudio-dialog-close';
-		close.textContent = '×';
-		close.title = cfg.closeLabel;
-		close.setAttribute('aria-label', cfg.closeLabel);
-		close.addEventListener('click', function () {
-			dialog.close();
-		});
-		bar.append(newTab, close);
-		const frame = document.createElement('iframe');
-		frame.className = 'docstudio-dialog-frame';
-		frame.title = cfg.label;
-		frame.setAttribute('referrerpolicy', 'no-referrer');
-		dialog.append(bar, frame);
-		dialog.addEventListener('close', function () {
-			frame.src = 'about:blank';
-		});
-		dialog.addEventListener('click', function (e) {
-			if (e.target === dialog) {
-				dialog.close();
-			}
-		});
-		document.body.appendChild(dialog);
-
-		// Escape pressed inside the viewer: only a message of the viewer frame itself is accepted
-		window.addEventListener('message', function (e) {
-			if (e.origin === window.location.origin && e.source === frame.contentWindow && e.data && e.data.type === 'docstudio:close') {
-				dialog.close();
-			}
-		});
-		return dialog;
+		const modulepart = params.get('modulepart') || '';
+		const file = params.get('file') || '';
+		if (!/^[A-Za-z0-9_]+$/.test(modulepart) || file === '' || params.get('hashp')) {
+			return null;
+		}
+		return { modulepart: modulepart, file: file, entity: params.get('entity') || '', extension: extensionOf(file) };
 	}
 
 	/**
-	 * @param {string} url Viewer URL
+	 * @param {Object} info Result of fileOfLink()
+	 * @param {string} viewer Code of the viewer
+	 * @returns {string}
 	 */
-	function openDialog(url) {
-		const dlg = getDialog();
-		dlg.querySelector('.docstudio-dialog-newtab').href = url;
-		dlg.querySelector('.docstudio-dialog-frame').src = url + '&embed=1';
-		dlg.showModal();
+	function viewUrl(info, viewer) {
+		const query = new URLSearchParams({ source: 'document', modulepart: info.modulepart, file: info.file, viewer: viewer });
+		if (info.entity) {
+			query.set('entity', info.entity);
+		}
+		return cfg.viewUrl + '?' + query.toString();
 	}
 
 	/**
-	 * Add the links in a part of the page
+	 * Open the viewer in the preview dialog of Dolibarr (so that everything bound to it, like the unalterable log of
+	 * the previews of invoices, still works), or in a new tab when there is no dialog (phone layout)
+	 * @param {string} url
+	 * @param {string} title
+	 */
+	function openViewer(url, title) {
+		if (typeof window.document_preview === 'function' && window.jQuery && window.jQuery.fn && window.jQuery.fn.dialog) {
+			window.document_preview(url + '&embed=1', 'text/html', title);
+		} else {
+			window.open(url, '_blank', 'noopener');
+		}
+	}
+
+	/**
+	 * Apply the handler of each file of a part of the page:
+	 * - preview of Dolibarr: nothing changes;
+	 * - none: the magnifier of Dolibarr is hidden;
+	 * - a viewer of DocStudio: the magnifier of Dolibarr opens it, or DocStudio adds its magnifier when Dolibarr has none.
 	 * @param {ParentNode} root
 	 */
 	function scan(root) {
 		root.querySelectorAll('a[href*="document.php?"]').forEach(function (link) {
-			if (link.dataset.docstudio || link.classList.contains('documentpreview') || link.classList.contains('pictopreview')) {
+			if (link.dataset.docstudio) {
 				return;
 			}
 			link.dataset.docstudio = '1';
-			// One link per line of the list, after the name of the file
-			const line = link.closest('tr, li, .ecmjqft');
-			if (!line || line.querySelector('.docstudio-open')) {
+			const info = fileOfLink(link);
+			const handler = info ? handlers[info.extension] : null;
+			if (!handler || handler === cfg.dolibarrHandler) {
 				return;
 			}
-			let params;
-			try {
-				const url = new URL(link.getAttribute('href'), window.location.href);
-				// Only document.php of Dolibarr itself (not the Documents tabs like societe/document.php)
-				if (url.origin !== window.location.origin || url.pathname !== cfg.documentPath) {
+
+			// Magnifier of Dolibarr: its href and type are changed, the click is still handled by Dolibarr
+			if (link.classList.contains('documentpreview')) {
+				if (handler === cfg.noneHandler) {
+					link.style.display = 'none';
 					return;
 				}
-				params = url.searchParams;
-			} catch (e) {
+				// Dolibarr opens this href in its dialog (embed: viewer without its own window controls)
+				link.setAttribute('href', viewUrl(info, handler) + '&embed=1');
+				link.setAttribute('mime', 'text/html');
+				link.title = cfg.label;
+				link.dataset.title = link.dataset.title || info.file.split('/').pop();
 				return;
 			}
-			const modulepart = params.get('modulepart') || '';
-			const file = params.get('file') || '';
-			// Public links (hashp) and unknown types are left alone
-			if (!/^[A-Za-z0-9_]+$/.test(modulepart) || file === '' || params.get('hashp') || !extensions.has(extensionOf(file))) {
+			if (handler === cfg.noneHandler) {
 				return;
 			}
-			const query = new URLSearchParams({ source: 'document', modulepart: modulepart, file: file });
-			if (params.get('entity')) {
-				query.set('entity', params.get('entity'));
-			}
-			const viewUrl = cfg.viewUrl + '?' + query.toString();
 
+			// Name of the file: DocStudio adds its magnifier when the line has none of Dolibarr
+			const line = link.closest('tr, li, .ecmjqft');
+			if (!line || line.querySelector('a.documentpreview, .docstudio-open')) {
+				return;
+			}
+			const url = viewUrl(info, handler);
 			const open = document.createElement('a');
 			open.className = 'docstudio-open paddingright marginleftonly';
-			open.href = viewUrl;
+			open.href = url;
+			open.target = '_blank';
+			open.rel = 'noopener';
 			open.title = cfg.label;
 			open.setAttribute('aria-label', cfg.label);
 			const icon = document.createElement('span');
-			icon.className = 'fas fa-eye docstudio-open-icon';
+			icon.className = 'fa fa-search-plus pictofixedwidth docstudio-open-icon';
 			open.appendChild(icon);
 			open.addEventListener('click', function (e) {
-				if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0 || typeof HTMLDialogElement === 'undefined') {
+				if (e.ctrlKey || e.metaKey || e.shiftKey || e.button !== 0) {
 					return;
 				}
 				e.preventDefault();
-				openDialog(viewUrl);
+				openViewer(url, info.file.split('/').pop());
 			});
 			link.after(open);
 		});
 	}
+
+	// Escape pressed inside the viewer closes the preview dialog of Dolibarr. Only a message of a frame of this site
+	// is accepted, and it can only close the dialog.
+	window.addEventListener('message', function (e) {
+		if (e.origin !== window.location.origin || !e.data || e.data.type !== 'docstudio:close') {
+			return;
+		}
+		const frames = document.querySelectorAll('#dialogforpopup object, #dialogforpopup iframe');
+		const fromPreview = Array.prototype.some.call(frames, function (frame) {
+			return frame.contentWindow === e.source;
+		});
+		if (fromPreview && window.jQuery) {
+			window.jQuery('#dialogforpopup').dialog('close');
+		}
+	});
 
 	function start() {
 		scan(document);

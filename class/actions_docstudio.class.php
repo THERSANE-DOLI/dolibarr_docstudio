@@ -79,8 +79,8 @@ class ActionsDocStudio extends CommonHookActions
 		$langs->load('docstudio@docstudio');
 
 		$registry = new DocStudio($this->db);
-		$extensions = $registry->getSupportedExtensions();
-		if (empty($extensions)) {
+		$handlers = $registry->getHandlers($user);
+		if (empty($handlers)) {
 			return 0;
 		}
 
@@ -88,10 +88,10 @@ class ActionsDocStudio extends CommonHookActions
 		docstudioPrintJsonData('docstudio-links-config', array(
 			'viewUrl' => dol_buildpath('/docstudio/view.php', 1),
 			'documentPath' => DOL_URL_ROOT.'/document.php',
-			'extensions' => $extensions,
+			'handlers' => $handlers,
+			'dolibarrHandler' => DocStudio::HANDLER_DOLIBARR,
+			'noneHandler' => DocStudio::HANDLER_NONE,
 			'label' => $langs->transnoentitiesnoconv('DocStudioOpenWithDocStudio'),
-			'newTabLabel' => $langs->transnoentitiesnoconv('DocStudioOpenInNewTab'),
-			'closeLabel' => $langs->transnoentitiesnoconv('DocStudioCloseDialog'),
 		));
 		print '<script nonce="'.getNonce().'" src="'.dol_escape_htmltag(docstudioAssetUrl('/docstudio/js/docstudio-links.js')).'"></script>'."\n";
 		$this->resprints = ob_get_clean();

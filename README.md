@@ -4,10 +4,12 @@ View the documents of Dolibarr without leaving it.
 
 ## Features
 
-- « Open with DocStudio » link next to the files of the Documents tabs, of the Documents block of the cards and of
-  the ECM: the file opens in a dialog (Ctrl+click: in a new tab).
+- File associations: for each file type, the administrator chooses what opens it from the magnifier of the lists of
+  documents (Documents tabs, Documents block of the cards, ECM): a viewer of DocStudio, the preview of Dolibarr or no
+  preview. He may leave some choices to the users, on their user card.
+- The viewer opens in the preview dialog of Dolibarr (Ctrl+click: in a new tab).
 - Built-in viewers, nothing else to install:
-  - PDF (pdf.js, embedded: pages, text selection, zoom);
+  - PDF (pdf.js, embedded: pages, text selection, zoom, search, thumbnails, print);
   - images (PNG, JPEG, GIF, WebP, BMP, AVIF, SVG);
   - CSV and TSV as a sortable table;
   - text files (TXT, LOG, JSON, XML, HTML source, EML source...).

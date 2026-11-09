@@ -51,7 +51,7 @@ class modDocStudio extends DolibarrModules
 		$this->descriptionlong = "DocStudioDescriptionLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '0.1.0';
+		$this->version = '0.2.0';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'docstudio@docstudio';
 
@@ -100,7 +100,10 @@ class modDocStudio extends DolibarrModules
 			$conf->docstudio->enabled = 0;
 		}
 
-		$this->tabs = array();
+		// Tab of the user cards, only when the administrator left a choice of opening to the users
+		$this->tabs = array(
+			array('data' => 'user:+docstudio:DocStudioOpeningTab:docstudio@docstudio:getDolGlobalInt("DOCSTUDIO_HAS_USER_CHOICES"):/docstudio/user_opening.php?id=__ID__'),
+		);
 		$this->dictionaries = array();
 		$this->boxes = array();
 		$this->cronjobs = array();

@@ -86,6 +86,17 @@ if ($provider === null) {
 
 $title = $provider !== null ? $provider->getFileName() : $langs->trans('DocStudio');
 $viewers = $provider !== null ? $registry->getViewersFor($provider->getExtension(), $provider->getSize()) : array();
+// « Open with »: the viewers the administrator allows for this type; all of them when none is allowed (direct opening
+// by another module, like the attachments of a mail)
+$defaultViewer = '';
+if ($provider !== null) {
+	$allowed = array_intersect_key($viewers, array_flip($registry->getUserChoices($provider->getExtension())));
+	if (count($allowed)) {
+		$viewers = $allowed;
+	}
+	$handler = $registry->getHandler($provider->getExtension(), $user);
+	$defaultViewer = isset($viewers[$handler]) ? $handler : '';
+}
 
 $cssUrl = docstudioAssetUrl('/docstudio/css/docstudio-view.css');
 // Same choice as the theme: 0 = light (default), 1 = dark, 2 = like the system
@@ -118,6 +129,10 @@ if (count($viewers) > 1) {
 	}
 	print '</select></label>';
 }
+if ($embed && $provider !== null) {
+	$selfUrl = DocStudio::buildUrl('view.php', $source, $provider->getParams());
+	print '<a class="docstudio-button" href="'.dol_escape_htmltag($selfUrl).'" target="_blank" rel="noopener" title="'.dol_escape_htmltag($langs->trans('DocStudioOpenInNewTab')).'">&#8599;</a>';
+}
 if ($provider !== null && $provider->getDownloadUrl() !== '') {
 	print '<a class="docstudio-button" href="'.dol_escape_htmltag($provider->getDownloadUrl()).'" download>'.dol_escape_htmltag($langs->trans('Download')).'</a>';
 }
@@ -148,6 +163,7 @@ if ($provider !== null && count($viewers)) {
 		'contentUrl' => DocStudio::buildUrl('ajax/content.php', $source, $provider->getParams()),
 		'viewers' => $viewerList,
 		'viewerAsked' => $viewerAsked,
+		'viewerDefault' => $defaultViewer,
 		'imageMimeTypes' => DocStudio::getImageMimeTypes(),
 		'pdfjs' => array(
 			'lib' => dol_buildpath('/docstudio/vendor/pdfjs/pdf.min.js', 1),
@@ -161,6 +177,8 @@ if ($provider !== null && count($viewers)) {
 			'DocStudioLoading', 'DocStudioErrorLoading', 'DocStudioErrorNoViewer', 'DocStudioOpeningCancelled',
 			'DocStudioZoomIn', 'DocStudioZoomOut', 'DocStudioZoomFit', 'DocStudioZoomActual', 'DocStudioPage',
 			'DocStudioPdfPassword', 'DocStudioRows', 'DocStudioRowsTruncated', 'DocStudioWrapLines', 'DocStudioEncoding',
+			'DocStudioThumbnails', 'DocStudioSearch', 'DocStudioSearchPrevious', 'DocStudioSearchNext', 'DocStudioSearchResults',
+			'DocStudioSearchNone', 'DocStudioPrint', 'DocStudioPreparingPrint',
 		)),
 	);
 	docstudioPrintJsonData('docstudio-config', $config);

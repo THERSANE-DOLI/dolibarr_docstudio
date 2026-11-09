@@ -35,6 +35,12 @@ dol_include_once('/docstudio/class/docstudiodocumentprovider.class.php');
  */
 class DocStudio
 {
+	/** Handler of a type: the preview of Dolibarr (document_preview of the core) */
+	const HANDLER_DOLIBARR = 'dolibarr';
+
+	/** Handler of a type: no preview, download only */
+	const HANDLER_NONE = 'none';
+
 	/** Max size of a file read by the text viewer, in bytes */
 	const MAX_TEXT_SIZE = 5242880;
 
@@ -208,6 +214,7 @@ class DocStudio
 		}
 		$css = isset($viewer['css']) ? (string) $viewer['css'] : '';
 		if (!preg_match('/^[a-z][a-z0-9_]{1,31}$/', $code) || isset($this->viewers[$code]) || empty($extensions)
+			|| in_array($code, array(self::HANDLER_DOLIBARR, self::HANDLER_NONE), true)
 			|| self::getModuleOfPath((string) $viewer['script'], '/\.js$/') !== $module
 			|| ($css !== '' && self::getModuleOfPath($css, '/\.css$/') !== $module)) {
 			$this->refuse('viewer '.$code);
@@ -321,6 +328,175 @@ class DocStudio
 		}
 
 		return array_values(array_unique($list));
+	}
+
+	/**
+	 * Family of a file type, to group the types on the setup pages
+	 *
+	 * @param string $extension Lowercase extension
+	 * @return string           'pdf', 'image', 'table', 'text' or 'other'
+	 */
+	public static function getFamily($extension)
+	{
+		if ($extension === 'pdf') {
+			return 'pdf';
+		}
+		if (isset(self::getImageMimeTypes()[$extension])) {
+			return 'image';
+		}
+		if (in_array($extension, array('csv', 'tsv', 'xls', 'xlsx', 'ods'), true)) {
+			return 'table';
+		}
+		if (in_array($extension, array('txt', 'text', 'log', 'md', 'json', 'xml', 'ini', 'conf', 'yml', 'yaml', 'sql', 'html', 'htm', 'eml', 'vcf', 'ics'), true)) {
+			return 'text';
+		}
+
+		return 'other';
+	}
+
+	/**
+	 * Ways to open a file type: the viewers able to show it, the preview of Dolibarr when the core can show it, or
+	 * no preview (download only)
+	 *
+	 * @param string $extension Lowercase extension
+	 * @return array<string,string> Handler code => label
+	 */
+	public function getHandlersFor($extension)
+	{
+		global $langs;
+
+		$handlers = array();
+		foreach ($this->getViewers() as $code => $viewer) {
+			if (in_array($extension, $viewer['extensions'], true)) {
+				$handlers[$code] = $langs->trans('DocStudioHandlerViewer', $viewer['label']);
+			}
+		}
+		if (dolIsAllowedForPreview('file.'.$extension)) {
+			$handlers[self::HANDLER_DOLIBARR] = $langs->trans('DocStudioHandlerDolibarr');
+		}
+		$handlers[self::HANDLER_NONE] = $langs->trans('DocStudioHandlerNone');
+
+		return $handlers;
+	}
+
+	/**
+	 * Handler used when the administrator chose nothing: the preview of Dolibarr when the core can show the type
+	 * (PDF, images...), else the viewer of highest priority
+	 *
+	 * @param string $extension Lowercase extension
+	 * @return string           Handler code
+	 */
+	public function getDefaultHandler($extension)
+	{
+		$handlers = $this->getHandlersFor($extension);
+		if (isset($handlers[self::HANDLER_DOLIBARR])) {
+			return self::HANDLER_DOLIBARR;
+		}
+
+		return (string) key($handlers);
+	}
+
+	/**
+	 * Name of the constant of the handler chosen by the administrator for a type
+	 *
+	 * @param string $extension Lowercase extension
+	 * @param string $suffix    '' for the handler, '_CHOICES' for the handlers left to the choice of the users
+	 * @return string
+	 */
+	public static function getConstName($extension, $suffix = '')
+	{
+		return 'DOCSTUDIO_VIEW_'.strtoupper(preg_replace('/[^a-z0-9]/', '', $extension)).$suffix;
+	}
+
+	/**
+	 * Handler chosen by the administrator for a type (the default one if the choice is no longer available)
+	 *
+	 * @param string $extension Lowercase extension
+	 * @return string           Handler code
+	 */
+	public function getAdminHandler($extension)
+	{
+		$handlers = $this->getHandlersFor($extension);
+		$chosen = getDolGlobalString(self::getConstName($extension));
+
+		return isset($handlers[$chosen]) ? $chosen : $this->getDefaultHandler($extension);
+	}
+
+	/**
+	 * Handlers the administrator allows the users to choose for a type, the handler of the administrator first.
+	 * Only one handler means no choice for the users.
+	 *
+	 * @param string $extension Lowercase extension
+	 * @return string[]         Handler codes
+	 */
+	public function getUserChoices($extension)
+	{
+		$handlers = $this->getHandlersFor($extension);
+		$admin = $this->getAdminHandler($extension);
+		$choices = array($admin);
+		foreach (explode(',', getDolGlobalString(self::getConstName($extension, '_CHOICES'))) as $code) {
+			if ($code !== '' && isset($handlers[$code]) && !in_array($code, $choices, true)) {
+				$choices[] = $code;
+			}
+		}
+
+		return $choices;
+	}
+
+	/**
+	 * Handler used for a user: the one of the user when the administrator allows it, else the one of the administrator
+	 *
+	 * @param string    $extension Lowercase extension
+	 * @param User|null $fuser     User, null for the administrator choice only
+	 * @return string              Handler code
+	 */
+	public function getHandler($extension, $fuser = null)
+	{
+		$choices = $this->getUserChoices($extension);
+		if ($fuser !== null && count($choices) > 1) {
+			$name = self::getConstName($extension);
+			$mine = (isset($fuser->conf->$name) ? (string) $fuser->conf->$name : '');
+			if (in_array($mine, $choices, true)) {
+				return $mine;
+			}
+		}
+
+		return $choices[0];
+	}
+
+	/**
+	 * Handler of every type a viewer can show, for a user
+	 *
+	 * @param User|null $fuser User
+	 * @return array<string,string> Extension => handler code
+	 */
+	public function getHandlers($fuser = null)
+	{
+		$result = array();
+		foreach ($this->getSupportedExtensions() as $extension) {
+			$result[$extension] = $this->getHandler($extension, $fuser);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Types a viewer can show, grouped by family then sorted
+	 *
+	 * @return array<string,string[]> Family => extensions
+	 */
+	public function getExtensionsByFamily()
+	{
+		$result = array('pdf' => array(), 'image' => array(), 'table' => array(), 'text' => array(), 'other' => array());
+		foreach ($this->getSupportedExtensions() as $extension) {
+			$result[self::getFamily($extension)][] = $extension;
+		}
+		foreach ($result as $family => $list) {
+			sort($list);
+			$result[$family] = $list;
+		}
+
+		return array_filter($result);
 	}
 
 	/**
