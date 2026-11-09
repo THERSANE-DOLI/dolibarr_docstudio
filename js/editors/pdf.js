@@ -36,6 +36,7 @@ const TOOL_IMAGE = 'image';
 const TOOL_REDACT = 'redact';
 const TOOL_CROP = 'crop';
 const REDACT_DPI = 200;
+const SVG_NS = 'http://www.w3.org/2000/svg';
 const LINE_HEIGHT = 1.2;
 const ASCENT = 0.8;
 
@@ -267,6 +268,19 @@ window.DocStudio.registerViewer('pdfedit', {
 				return;
 			}
 			layer.replaceChildren();
+			if (deleted.has(pageNumber)) {
+				// Deleted page: veil and stamp over the page, with the way back
+				const veil = document.createElement('div');
+				veil.className = 'ds-deleted';
+				const stamp = document.createElement('div');
+				stamp.className = 'ds-deleted-stamp';
+				stamp.textContent = t('DocStudioPageDeleted');
+				const restoreButton = ctx.utils.button(t('DocStudioRestorePage'), t('DocStudioRestorePage'), function () {
+					toggleDeleted(pageNumber);
+				});
+				veil.append(stamp, restoreButton);
+				layer.appendChild(veil);
+			}
 			layer.classList.toggle('ds-zone-active', [TOOL_REDACT, TOOL_CROP, TOOL_TEXT, TOOL_LINE].includes(tool));
 			layer.classList.toggle('ds-text-tool', tool === TOOL_TEXT);
 
@@ -665,6 +679,24 @@ window.DocStudio.registerViewer('pdfedit', {
 			del.title = deleted.has(pageNumber) ? t('DocStudioRestorePage') : t('DocStudioDeletePage');
 		}
 
+		/**
+		 * Delete a page (kept until saving, shown with a stamp) or keep it again
+		 * @param {number} pageNumber
+		 */
+		function toggleDeleted(pageNumber) {
+			if (deleted.has(pageNumber)) {
+				deleted.delete(pageNumber);
+			} else if (deleted.size < pageCount - 1) {
+				deleted.add(pageNumber);
+			}
+			setDirty();
+			refreshThumb(pageNumber);
+			drawLayer(pageNumber);
+			if (typeof syncDeleteButton === 'function') {
+				syncDeleteButton();
+			}
+		}
+
 		function renderPanel() {
 			pagesPanel.replaceChildren();
 			const title = document.createElement('div');
@@ -677,7 +709,7 @@ window.DocStudio.registerViewer('pdfedit', {
 					const cut = document.createElement('button');
 					cut.type = 'button';
 					cut.className = 'ds-cut' + (cuts.has(pageNumber) ? ' ds-cut-active' : '');
-					cut.textContent = '✂';
+					cut.appendChild(icon('split'));
 					cut.title = cuts.has(pageNumber) ? t('DocStudioSplitRemove') : t('DocStudioSplitHere');
 					cut.addEventListener('click', function () {
 						toggleCut(pageNumber);
@@ -720,13 +752,7 @@ window.DocStudio.registerViewer('pdfedit', {
 			const label = document.createElement('span');
 			label.textContent = String(pageNumber);
 			const del = ctx.utils.button('', t('DocStudioDeletePage'), function () {
-				if (deleted.has(pageNumber)) {
-					deleted.delete(pageNumber);
-				} else if (deleted.size < pageCount - 1) {
-					deleted.add(pageNumber);
-				}
-				setDirty();
-				refreshThumb(pageNumber);
+				toggleDeleted(pageNumber);
 			});
 			del.classList.add('ds-thumb-delete');
 			bar.append(label, del);
@@ -766,6 +792,7 @@ window.DocStudio.registerViewer('pdfedit', {
 		/* Rotation: applied at once to the document (visible everywhere), the annotations are kept */
 
 		let busy = false;
+		let syncDeleteButton = null;
 		let lastAnnotated = null;
 
 		/**
@@ -797,7 +824,6 @@ window.DocStudio.registerViewer('pdfedit', {
 
 		/* Tools: vertical palette (with groups of tools of the same kind), options of the tool in the top bar */
 
-		const SVG_NS = 'http://www.w3.org/2000/svg';
 
 		/**
 		 * @param {string} name Icon of the sprite of the page (img/docstudio-icons.svg)
@@ -955,6 +981,7 @@ window.DocStudio.registerViewer('pdfedit', {
 			btn.appendChild(icon(name));
 			btn.addEventListener('click', onClick);
 			palette.appendChild(btn);
+			return btn;
 		}
 
 		const seenGroups = new Set();
@@ -975,22 +1002,17 @@ window.DocStudio.registerViewer('pdfedit', {
 		actionButton('rotate-right', t('DocStudioRotateRight'), function () {
 			rotateCurrentPage(90);
 		});
-		actionButton('split', t('DocStudioSplitHere'), function () {
-			const pageNumber = pdfViewer.currentPageNumber;
-			if (order.indexOf(pageNumber) < order.length - 1) {
-				toggleCut(pageNumber);
-			}
+		const deleteButton = actionButton('delete', t('DocStudioDeletePage'), function () {
+			toggleDeleted(pdfViewer.currentPageNumber);
 		});
-		actionButton('delete', t('DocStudioDeletePage'), function () {
-			const pageNumber = pdfViewer.currentPageNumber;
-			if (deleted.has(pageNumber)) {
-				deleted.delete(pageNumber);
-			} else if (deleted.size < pageCount - 1) {
-				deleted.add(pageNumber);
-			}
-			setDirty();
-			refreshThumb(pageNumber);
-		});
+		// The delete button shows whether the page on screen is deleted
+		syncDeleteButton = function () {
+			const isDeleted = deleted.has(pdfViewer.currentPageNumber);
+			deleteButton.classList.toggle('docstudio-active', isDeleted);
+			deleteButton.setAttribute('aria-pressed', isDeleted ? 'true' : 'false');
+			deleteButton.title = isDeleted ? t('DocStudioRestorePage') : t('DocStudioDeletePage');
+		};
+		eventBus.on('pagechanging', syncDeleteButton);
 
 		/* Options of the tool (top bar) */
 

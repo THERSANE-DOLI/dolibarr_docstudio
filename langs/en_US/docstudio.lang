@@ -163,3 +163,4 @@ DocStudioHintText = Click on the page where the text starts.
 DocStudioHintDraw = Draw with the mouse or the finger.
 DocStudioHintHighlight = Select text to highlight it, or draw free hand elsewhere.
 DocStudioHintLine = Drag to draw: horizontal or vertical when close to it, any angle with Shift.
+DocStudioPageDeleted = Deleted page

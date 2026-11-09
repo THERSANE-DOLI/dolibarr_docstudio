@@ -2,6 +2,11 @@
 
 ## 0.5
 
+- FIX: PDF editor, a deleted page did not look deleted, scissors out of the toolbar and on the dashed line :   0.5.1
+  - deleted page: stamp « Deleted page » and veil over it, button « Keep the page », delete button of the palette
+    pressed while the page on screen is deleted
+  - splitting only from the scissors between the pages of the panel, bigger and centered on their dashed line
+
 - NEW: PDF editor laid out like the image editors: palette of tools on the left, options of the tool on top :   0.5.0
   - vertical palette with icons: Select, Text, Draw / Highlight / Straight line (group opened by its small triangle,
     a right click or a long press, the button shows the last tool used), Image, Redact, Crop, then the actions on

@@ -215,7 +215,7 @@ if ($provider !== null && count($viewers)) {
 			'DocStudioPartsSaved', 'DocStudioFont', 'DocStudioBold', 'DocStudioHighlightMode', 'DocStudioHighlightFree',
 			'DocStudioHighlightLine', 'DocStudioFontCharsetError', 'DocStudioTextPlaceholder', 'DocStudioMove',
 			'DocStudioTools', 'DocStudioMoreTools', 'DocStudioChooseImage', 'DocStudioHintSelect', 'DocStudioHintText', 'DocStudioHintDraw',
-			'DocStudioHintHighlight', 'DocStudioHintLine',
+			'DocStudioHintHighlight', 'DocStudioHintLine', 'DocStudioPageDeleted',
 		)),
 	);
 	docstudioPrintJsonData('docstudio-config', $config);
