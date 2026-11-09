@@ -70,14 +70,16 @@ $hookmanager->initHooks(array('docstudiouseropening', 'globalcard'));
 
 $registry = new DocStudio($db);
 
-// Types where the administrator left a choice
-$types = array();
-foreach ($registry->getSupportedExtensions() as $extension) {
-	if (count($registry->getUserChoices($extension)) > 1) {
-		$types[] = $extension;
+// Types where the administrator left a choice, for viewing and for editing
+$types = array(DocStudio::ACTION_VIEW => array(), DocStudio::ACTION_EDIT => array());
+foreach ($types as $act => $list) {
+	foreach ($registry->getSupportedExtensions($act) as $extension) {
+		if (count($registry->getUserChoices($extension, $act)) > 1) {
+			$types[$act][] = $extension;
+		}
 	}
+	sort($types[$act]);
 }
-sort($types);
 
 
 /*
@@ -87,11 +89,13 @@ sort($types);
 if ($action == 'update') {
 	$posted = GETPOST('handler', 'array');
 	$params = array();
-	foreach ($types as $extension) {
-		$choices = $registry->getUserChoices($extension);
-		$value = (isset($posted[$extension]) && is_string($posted[$extension])) ? $posted[$extension] : '';
-		// Only a handler allowed by the administrator is kept; the one of the administrator means « no own choice »
-		$params[DocStudio::getConstName($extension)] = (in_array($value, $choices, true) && $value !== $choices[0]) ? $value : '';
+	foreach ($types as $act => $list) {
+		foreach ($list as $extension) {
+			$choices = $registry->getUserChoices($extension, $act);
+			$value = (isset($posted[$act][$extension]) && is_string($posted[$act][$extension])) ? $posted[$act][$extension] : '';
+			// Only a handler allowed by the administrator is kept; the one of the administrator means « no own choice »
+			$params[DocStudio::getConstName($extension, '', $act)] = (in_array($value, $choices, true) && $value !== $choices[0]) ? $value : '';
+		}
 	}
 	if (dol_set_user_param($db, $conf, $object, $params) > 0) {
 		setEventMessages($langs->trans("SetupSaved"), null, 'mesgs');
@@ -118,7 +122,7 @@ dol_banner_tab($object, 'id', $linkback, $user->hasRight('user', 'user', 'lire')
 print '<div class="underbanner clearboth"></div>';
 print '<br>';
 
-if (empty($types)) {
+if (empty($types[DocStudio::ACTION_VIEW]) && empty($types[DocStudio::ACTION_EDIT])) {
 	print '<span class="opacitymedium">'.$langs->trans('DocStudioNoUserChoice').'</span>';
 } else {
 	print '<span class="opacitymedium">'.$langs->trans('DocStudioUserChoicesHelp').'</span><br><br>';
@@ -127,20 +131,25 @@ if (empty($types)) {
 	print '<input type="hidden" name="action" value="update">';
 	print '<div class="div-table-responsive-no-min">';
 	print '<table class="noborder centpercent">';
-	print '<tr class="liste_titre"><td>'.$langs->trans('DocStudioFileType').'</td><td>'.$langs->trans('DocStudioOpenBy').'</td></tr>';
-	foreach ($types as $extension) {
-		$handlers = $registry->getHandlersFor($extension);
-		$choices = $registry->getUserChoices($extension);
-		$current = $registry->getHandler($extension, $object);
-		print '<tr class="oddeven">';
-		print '<td class="nowraponall"><strong>.'.dol_escape_htmltag($extension).'</strong></td>';
-		print '<td><select class="flat minwidth200" name="handler['.dol_escape_htmltag($extension).']">';
-		foreach ($choices as $index => $code) {
-			$label = $handlers[$code].($index === 0 ? ' ('.$langs->trans('DocStudioAdminChoice').')' : '');
-			print '<option value="'.dol_escape_htmltag($code).'"'.($code === $current ? ' selected' : '').'>'.dol_escape_htmltag($label).'</option>';
+	foreach (array(DocStudio::ACTION_VIEW => 'DocStudioOpenBy', DocStudio::ACTION_EDIT => 'DocStudioEditedBy') as $act => $columnLabel) {
+		if (empty($types[$act])) {
+			continue;
 		}
-		print '</select></td>';
-		print '</tr>';
+		print '<tr class="liste_titre"><td>'.$langs->trans('DocStudioFileType').'</td><td>'.$langs->trans($columnLabel).'</td></tr>';
+		foreach ($types[$act] as $extension) {
+			$handlers = $registry->getHandlersFor($extension, $act);
+			$choices = $registry->getUserChoices($extension, $act);
+			$current = $registry->getHandler($extension, $object, $act);
+			print '<tr class="oddeven">';
+			print '<td class="nowraponall"><strong>.'.dol_escape_htmltag($extension).'</strong></td>';
+			print '<td><select class="flat minwidth200" name="handler['.$act.']['.dol_escape_htmltag($extension).']">';
+			foreach ($choices as $index => $code) {
+				$label = $handlers[$code].($index === 0 ? ' ('.$langs->trans('DocStudioAdminChoice').')' : '');
+				print '<option value="'.dol_escape_htmltag($code).'"'.($code === $current ? ' selected' : '').'>'.dol_escape_htmltag($label).'</option>';
+			}
+			print '</select></td>';
+			print '</tr>';
+		}
 	}
 	print '</table>';
 	print '</div>';

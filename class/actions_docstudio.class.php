@@ -89,6 +89,10 @@ class ActionsDocStudio extends CommonHookActions
 			'viewUrl' => dol_buildpath('/docstudio/view.php', 1),
 			'documentPath' => DOL_URL_ROOT.'/document.php',
 			'handlers' => $handlers,
+			// Editing: internal users only, the editor checks the permission to write again
+			'editHandlers' => empty($user->socid) ? $registry->getHandlers($user, DocStudio::ACTION_EDIT) : array(),
+			'editUrl' => dol_buildpath('/docstudio/edit.php', 1),
+			'editLabel' => $langs->transnoentitiesnoconv('DocStudioEdit'),
 			'dolibarrHandler' => DocStudio::HANDLER_DOLIBARR,
 			'noneHandler' => DocStudio::HANDLER_NONE,
 			'label' => $langs->transnoentitiesnoconv('DocStudioOpenWithDocStudio'),

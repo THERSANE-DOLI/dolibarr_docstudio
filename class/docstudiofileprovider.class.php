@@ -89,6 +89,33 @@ abstract class DocStudioFileProvider
 	abstract public function outputContent();
 
 	/**
+	 * The user may change this file (permission to write on its owner)
+	 *
+	 * @param User $fuser User
+	 * @return bool
+	 */
+	public function canWrite(User $fuser)
+	{
+		return false;
+	}
+
+	/**
+	 * Save a new content for the loaded file, already checked by DocStudio (type, size, antivirus is done here)
+	 *
+	 * @param string $tmpFile   Full path of the new content (temporary file, removed by DocStudio after the call)
+	 * @param string $mode      'copy': new file next to the original, 'replace': instead of the original
+	 * @param string $fileName  Name of the copy (mode 'copy' only)
+	 * @param bool   $overwrite Overwrite a file of the same name (mode 'copy' only)
+	 * @param User   $fuser     User saving
+	 * @return array{result:int,error:string,exists:int,filename:string} result 1 = saved, 0 = a file of this name
+	 *                                                                   exists, -1 = error
+	 */
+	public function save($tmpFile, $mode, $fileName, $overwrite, User $fuser)
+	{
+		return array('result' => -1, 'error' => 'Not supported', 'exists' => 0, 'filename' => '');
+	}
+
+	/**
 	 * URL to download the file with the usual mechanism of its owner (document.php...), or '' when there is none
 	 *
 	 * @return string

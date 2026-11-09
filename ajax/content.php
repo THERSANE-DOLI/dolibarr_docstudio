@@ -88,8 +88,9 @@ if ($provider === null) {
 	httponly_accessforbidden(dol_escape_htmltag($error), 403, 1);
 }
 
-// A viewer must exist for this type and this size: DocStudio never serves a file no viewer would show
-if (!count($registry->getViewersFor($provider->getExtension(), $provider->getSize()))) {
+// A viewer or an editor must exist for this type and this size: DocStudio never serves a file none would show
+if (!count($registry->getViewersFor($provider->getExtension(), $provider->getSize()))
+	&& !count($registry->getViewersFor($provider->getExtension(), $provider->getSize(), DocStudio::ACTION_EDIT))) {
 	httponly_accessforbidden(dol_escape_htmltag($langs->trans('DocStudioErrorNoViewer')), 403, 1);
 }
 

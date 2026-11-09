@@ -1,5 +1,22 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.3
+
+- NEW: PDF editor without server (annotations, pages, crop, redaction) :   0.3.0
+  - pencil « Edit with DocStudio » on the lines of the lists of documents where the user may delete the file,
+    editor page with its own content security policy, back to the list after saving
+  - annotations with the editors of pdf.js: text, drawing, highlight, image
+  - pages: rotate, delete, reorder by drag and drop in the panel of the pages
+  - crop of a page or of every page (the content outside of the frame is only hidden, said in the editor)
+  - redaction: pages with a redacted zone replaced by their image, new file without metadata, bookmarks,
+    attachments nor previous versions, then checked (the hidden text must be nowhere in the file, else nothing is
+    saved); real impact explained before saving
+  - saving as a copy next to the original or instead of it: CSRF token, permission to write of document.php,
+    content checked on the server (real PDF), antivirus, single extension in the name, ECM index kept (share link
+    of a replaced file kept), hooks docstudioBeforeSave (PHP) and docstudio:beforeSave (JavaScript)
+  - « Editing » in the file associations (PDF editor by default, « no editing » possible, choices for the users)
+  - pdf-lib 1.17.1 embedded (MIT)
+
 ## 0.2
 
 - NEW: file associations, search, thumbnails and print in the PDF viewer :   0.2.0

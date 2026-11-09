@@ -91,33 +91,36 @@ if ($action == 'update') {
 	$error = 0;
 	$hasChoices = 0;
 	$db->begin();
-	foreach ($registry->getSupportedExtensions() as $extension) {
-		$handlers = $registry->getHandlersFor($extension);
-		// Only a handler of the list of this type is kept (never a value of the browser as such)
-		$handler = (isset($postedHandlers[$extension]) && is_string($postedHandlers[$extension]) && isset($handlers[$postedHandlers[$extension]]))
-			? $postedHandlers[$extension] : $registry->getDefaultHandler($extension);
-		$choices = array();
-		if (isset($postedChoices[$extension]) && is_array($postedChoices[$extension])) {
-			foreach ($postedChoices[$extension] as $code) {
-				if (is_string($code) && isset($handlers[$code]) && $code !== $handler && !in_array($code, $choices, true)) {
-					$choices[] = $code;
+	foreach (array(DocStudio::ACTION_VIEW, DocStudio::ACTION_EDIT) as $act) {
+		foreach ($registry->getSupportedExtensions($act) as $extension) {
+			$handlers = $registry->getHandlersFor($extension, $act);
+			$posted = (isset($postedHandlers[$act]) && is_array($postedHandlers[$act])) ? $postedHandlers[$act] : array();
+			// Only a handler of the list of this type is kept (never a value of the browser as such)
+			$handler = (isset($posted[$extension]) && is_string($posted[$extension]) && isset($handlers[$posted[$extension]]))
+				? $posted[$extension] : $registry->getDefaultHandler($extension, $act);
+			$choices = array();
+			if (isset($postedChoices[$act][$extension]) && is_array($postedChoices[$act][$extension])) {
+				foreach ($postedChoices[$act][$extension] as $code) {
+					if (is_string($code) && isset($handlers[$code]) && $code !== $handler && !in_array($code, $choices, true)) {
+						$choices[] = $code;
+					}
 				}
 			}
-		}
-		$hasChoices = $hasChoices || count($choices);
+			$hasChoices = $hasChoices || count($choices);
 
-		if ($handler === $registry->getDefaultHandler($extension)) {
-			$res = dolibarr_del_const($db, DocStudio::getConstName($extension), $conf->entity);
-		} else {
-			$res = dolibarr_set_const($db, DocStudio::getConstName($extension), $handler, 'chaine', 0, '', $conf->entity);
+			if ($handler === $registry->getDefaultHandler($extension, $act)) {
+				$res = dolibarr_del_const($db, DocStudio::getConstName($extension, '', $act), $conf->entity);
+			} else {
+				$res = dolibarr_set_const($db, DocStudio::getConstName($extension, '', $act), $handler, 'chaine', 0, '', $conf->entity);
+			}
+			$error += ($res < 0) ? 1 : 0;
+			if (count($choices)) {
+				$res = dolibarr_set_const($db, DocStudio::getConstName($extension, '_CHOICES', $act), implode(',', $choices), 'chaine', 0, '', $conf->entity);
+			} else {
+				$res = dolibarr_del_const($db, DocStudio::getConstName($extension, '_CHOICES', $act), $conf->entity);
+			}
+			$error += ($res < 0) ? 1 : 0;
 		}
-		$error += ($res < 0) ? 1 : 0;
-		if (count($choices)) {
-			$res = dolibarr_set_const($db, DocStudio::getConstName($extension, '_CHOICES'), implode(',', $choices), 'chaine', 0, '', $conf->entity);
-		} else {
-			$res = dolibarr_del_const($db, DocStudio::getConstName($extension, '_CHOICES'), $conf->entity);
-		}
-		$error += ($res < 0) ? 1 : 0;
 	}
 	// Shows the tab « Opening of files » on the user cards only when the users have something to choose
 	if ($hasChoices) {
@@ -161,46 +164,56 @@ print '<form method="POST" action="'.$_SERVER['PHP_SELF'].'">';
 print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="update">';
 
-print '<div class="div-table-responsive-no-min">';
-print '<table class="noborder centpercent">';
-print '<tr class="liste_titre">';
-print '<td>'.$langs->trans("DocStudioFileType").'</td>';
-print '<td>'.$langs->trans("DocStudioOpenBy").'</td>';
-print '<td>'.$langs->trans("DocStudioUserChoices").'</td>';
-print '</tr>';
-
-foreach ($registry->getExtensionsByFamily() as $family => $extensions) {
-	print '<tr class="liste_titre_filter"><td colspan="3"><strong>'.$langs->trans('DocStudioFamily'.ucfirst($family)).'</strong></td></tr>';
-	$help = $langs->trans('DocStudioFamilyHelp'.ucfirst($family));
-	if ($help !== 'DocStudioFamilyHelp'.ucfirst($family)) {
-		print '<tr class="oddeven"><td colspan="3">'.info_admin($help, 0, 0, 'info').'</td></tr>';
+foreach (array(DocStudio::ACTION_VIEW => 'DocStudioOpenBy', DocStudio::ACTION_EDIT => 'DocStudioEditedBy') as $act => $columnLabel) {
+	$families = $registry->getExtensionsByFamily($act);
+	if (empty($families)) {
+		continue;
 	}
-	foreach ($extensions as $extension) {
-		$handlers = $registry->getHandlersFor($extension);
-		$current = $registry->getAdminHandler($extension);
-		$choices = $registry->getUserChoices($extension);
-		$default = $registry->getDefaultHandler($extension);
+	print load_fiche_titre($langs->trans($act === DocStudio::ACTION_EDIT ? 'DocStudioAssociationsEdit' : 'DocStudioAssociationsView'), '', '');
+	print '<div class="div-table-responsive-no-min">';
+	print '<table class="noborder centpercent">';
+	print '<tr class="liste_titre">';
+	print '<td>'.$langs->trans("DocStudioFileType").'</td>';
+	print '<td>'.$langs->trans($columnLabel).'</td>';
+	print '<td>'.$langs->trans("DocStudioUserChoices").'</td>';
+	print '</tr>';
 
-		print '<tr class="oddeven">';
-		print '<td class="nowraponall"><strong>.'.dol_escape_htmltag($extension).'</strong> <span class="opacitymedium small">'.dol_escape_htmltag(dol_mimetype('file.'.$extension)).'</span></td>';
-		print '<td><select class="flat minwidth200 docstudio-handler" name="handler['.dol_escape_htmltag($extension).']">';
-		foreach ($handlers as $code => $label) {
-			print '<option value="'.dol_escape_htmltag($code).'"'.($code === $current ? ' selected' : '').'>'.dol_escape_htmltag($label.($code === $default ? ' ('.$langs->trans('Default').')' : '')).'</option>';
+	foreach ($families as $family => $extensions) {
+		print '<tr class="liste_titre_filter"><td colspan="3"><strong>'.$langs->trans('DocStudioFamily'.ucfirst($family)).'</strong></td></tr>';
+		$helpKey = 'DocStudioFamilyHelp'.($act === DocStudio::ACTION_EDIT ? 'Edit' : '').ucfirst($family);
+		$help = $langs->trans($helpKey);
+		if ($help !== $helpKey) {
+			print '<tr class="oddeven"><td colspan="3">'.info_admin($help, 0, 0, 'info').'</td></tr>';
 		}
-		print '</select></td>';
-		print '<td>';
-		foreach ($handlers as $code => $label) {
-			$id = 'choice_'.$extension.'_'.$code;
-			print '<label class="nowraponall marginrightonly" for="'.dol_escape_htmltag($id).'">';
-			print '<input type="checkbox" id="'.dol_escape_htmltag($id).'" name="choices['.dol_escape_htmltag($extension).'][]" value="'.dol_escape_htmltag($code).'"'.(in_array($code, $choices, true) && $code !== $current ? ' checked' : '').'> ';
-			print dol_escape_htmltag($label).'</label> ';
+		foreach ($extensions as $extension) {
+			$handlers = $registry->getHandlersFor($extension, $act);
+			$current = $registry->getAdminHandler($extension, $act);
+			$choices = $registry->getUserChoices($extension, $act);
+			$default = $registry->getDefaultHandler($extension, $act);
+			$fieldExt = dol_escape_htmltag($extension);
+
+			print '<tr class="oddeven">';
+			print '<td class="nowraponall"><strong>.'.$fieldExt.'</strong> <span class="opacitymedium small">'.dol_escape_htmltag(dol_mimetype('file.'.$extension)).'</span></td>';
+			print '<td><select class="flat minwidth200 docstudio-handler" name="handler['.$act.']['.$fieldExt.']">';
+			foreach ($handlers as $code => $label) {
+				print '<option value="'.dol_escape_htmltag($code).'"'.($code === $current ? ' selected' : '').'>'.dol_escape_htmltag($label.($code === $default ? ' ('.$langs->trans('Default').')' : '')).'</option>';
+			}
+			print '</select></td>';
+			print '<td>';
+			foreach ($handlers as $code => $label) {
+				$id = 'choice_'.$act.'_'.$extension.'_'.$code;
+				print '<label class="nowraponall marginrightonly" for="'.dol_escape_htmltag($id).'">';
+				print '<input type="checkbox" id="'.dol_escape_htmltag($id).'" name="choices['.$act.']['.$fieldExt.'][]" value="'.dol_escape_htmltag($code).'"'.(in_array($code, $choices, true) && $code !== $current ? ' checked' : '').'> ';
+				print dol_escape_htmltag($label).'</label> ';
+			}
+			print '</td>';
+			print '</tr>';
 		}
-		print '</td>';
-		print '</tr>';
 	}
+	print '</table>';
+	print '</div>';
+	print '<br>';
 }
-print '</table>';
-print '</div>';
 
 print '<div class="center"><input type="submit" class="button button-save" value="'.$langs->trans("Save").'"></div>';
 print '</form>';

@@ -121,6 +121,47 @@
 		}
 	}
 
+	/**
+	 * Save a content made by an editor (edit page only). Runs the JavaScript hook docstudio:beforeSave first:
+	 *   await Dolibarr.executeHookAwait('docstudio:beforeSave', ctx), ctx = {source, file, mode, filename, cancel, reason}
+	 * The server checks everything again (permissions, type, size, antivirus, hook docstudioBeforeSave).
+	 * @param {Blob} blob New content
+	 * @param {{mode: string, filename: string, overwrite: boolean}} options
+	 * @returns {Promise<{result: number, error: string, exists: number, filename: string}>}
+	 */
+	async function saveContent(blob, options) {
+		const conf = getConfig();
+		const mode = options.mode === 'replace' ? 'replace' : 'copy';
+		let ctx = { source: conf.source, file: conf.file, mode: mode, filename: options.filename || '', cancel: false, reason: '' };
+		if (window.Dolibarr && typeof window.Dolibarr.executeHookAwait === 'function') {
+			try {
+				const result = await window.Dolibarr.executeHookAwait('docstudio:beforeSave', ctx);
+				if (result && typeof result === 'object') {
+					ctx = result;
+				}
+			} catch (e) {
+				ctx.cancel = true;
+				ctx.reason = e && e.message ? e.message : '';
+			}
+		}
+		if (ctx.cancel) {
+			return { result: -1, error: t('DocStudioErrorSave') + (ctx.reason ? ' ' + String(ctx.reason) : ''), exists: 0, filename: '' };
+		}
+		const form = new FormData();
+		form.append('token', conf.token || '');
+		form.append('mode', mode);
+		form.append('filename', options.filename || '');
+		form.append('overwrite', options.overwrite ? '1' : '0');
+		form.append('content', blob, 'content.' + conf.file.extension);
+		try {
+			const response = await fetch(conf.saveUrl, { method: 'POST', body: form, credentials: 'same-origin', redirect: 'error' });
+			const data = await response.json();
+			return data && typeof data === 'object' ? data : { result: -1, error: t('DocStudioErrorSave') };
+		} catch (e) {
+			return { result: -1, error: t('DocStudioErrorSave'), exists: 0, filename: '' };
+		}
+	}
+
 	const api = {
 		/**
 		 * Register the implementation of a viewer
@@ -147,6 +188,7 @@
 		},
 
 		getConfig: getConfig,
+		saveContent: saveContent,
 		t: t,
 		utils: Object.freeze({ button: button, decodeText: decodeText })
 	};

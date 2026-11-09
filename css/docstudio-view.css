@@ -58,6 +58,10 @@
 	box-sizing: border-box;
 }
 
+[hidden] {
+	display: none !important;
+}
+
 html, body {
 	height: 100%;
 	margin: 0;
@@ -428,4 +432,268 @@ body {
 
 @page {
 	margin: 0;
+}
+
+/* Editor page */
+.docstudio-editor-page .docstudio-main {
+	overflow: hidden;
+}
+
+.docstudio-editor-page .docstudio-container {
+	position: absolute;
+	inset: 0;
+	min-height: 0;
+}
+
+.docstudio-primary {
+	background: var(--ds-accent);
+	border-color: var(--ds-accent);
+	color: #ffffff;
+}
+
+:root[data-darkmode="1"] .docstudio-primary {
+	color: #10151c;
+}
+
+.docstudio-button.docstudio-active {
+	border-color: var(--ds-accent);
+	box-shadow: inset 0 0 0 1px var(--ds-accent);
+	font-weight: 600;
+}
+
+.ds-tools {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+.ds-color {
+	width: 34px;
+	height: 30px;
+	padding: 0 2px;
+	border: 1px solid var(--ds-border);
+	border-radius: 4px;
+	background: var(--ds-surface);
+}
+
+.ds-size {
+	width: 90px;
+}
+
+.ds-edit {
+	position: absolute;
+	inset: 0;
+	display: flex;
+}
+
+.ds-edit-pages {
+	flex: 0 0 auto;
+	width: 170px;
+	overflow-y: auto;
+	padding: 8px;
+	background: var(--ds-surface);
+	border-right: 1px solid var(--ds-border);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+}
+
+.ds-pages-title {
+	font-weight: 600;
+	color: var(--ds-muted);
+	align-self: flex-start;
+}
+
+.ds-thumb {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 4px;
+	padding: 4px;
+	border: 2px solid transparent;
+	border-radius: 4px;
+	cursor: grab;
+}
+
+.ds-thumb-dragging {
+	opacity: 0.4;
+}
+
+.ds-thumb-image {
+	display: block;
+	padding: 0;
+	border: 0;
+	background: #ffffff;
+	box-shadow: var(--ds-shadow);
+	cursor: pointer;
+	transition: transform 0.15s;
+}
+
+.ds-thumb-image canvas {
+	display: block;
+	max-width: 120px;
+}
+
+.ds-thumb-bar {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--ds-muted);
+	font-size: 12px;
+}
+
+.ds-thumb-bar .docstudio-button {
+	min-height: 24px;
+	padding: 0 6px;
+}
+
+.ds-thumb-deleted .ds-thumb-image {
+	opacity: 0.25;
+}
+
+.ds-thumb-deleted .ds-thumb-bar span {
+	text-decoration: line-through;
+}
+
+.ds-edit-wrap {
+	flex: 1 1 auto;
+	position: relative;
+	min-width: 0;
+}
+
+.ds-edit-viewer {
+	position: absolute;
+	inset: 0;
+	overflow: auto;
+	background: var(--ds-bg);
+}
+
+.ds-edit-notice {
+	position: absolute;
+	left: 12px;
+	right: 12px;
+	bottom: 12px;
+	z-index: 20;
+	padding: 8px 12px;
+	border-radius: 4px;
+	background: #fff4e5;
+	color: #663c00;
+	border: 1px solid #f0c27b;
+	box-shadow: var(--ds-shadow);
+	font-size: 13px;
+}
+
+/* Links of the PDF never active in the editor */
+.ds-edit-viewer .annotationLayer .linkAnnotation,
+.ds-edit-viewer .annotationLayer a {
+	pointer-events: none !important;
+}
+
+.ds-zone-layer {
+	position: absolute;
+	inset: 0;
+	z-index: 30;
+	pointer-events: none;
+}
+
+.ds-zone-layer.ds-zone-active {
+	pointer-events: auto;
+	cursor: crosshair;
+}
+
+.ds-zone {
+	position: absolute;
+	pointer-events: auto;
+}
+
+.ds-zone-redact {
+	background: rgba(0, 0, 0, 0.75);
+	outline: 2px solid #b42318;
+}
+
+.ds-zone-crop {
+	outline: 2px dashed #1565c0;
+	box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+}
+
+.ds-zone-ghost {
+	pointer-events: none;
+}
+
+.ds-zone-remove {
+	position: absolute;
+	top: -12px;
+	right: -12px;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	border: 1px solid var(--ds-border);
+	background: var(--ds-surface);
+	color: var(--ds-text);
+	cursor: pointer;
+	line-height: 1;
+	padding: 0;
+}
+
+.ds-dialog {
+	width: min(560px, calc(100vw - 32px));
+	border: 1px solid var(--ds-border);
+	border-radius: 6px;
+	background: var(--ds-surface);
+	color: var(--ds-text);
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.ds-dialog::backdrop {
+	background: rgba(0, 0, 0, 0.45);
+}
+
+.ds-dialog h2 {
+	margin: 0 0 12px;
+	font-size: 17px;
+}
+
+.ds-choice,
+.ds-field {
+	display: block;
+	margin: 8px 0;
+}
+
+.ds-field input {
+	width: 100%;
+	margin-top: 4px;
+	font: inherit;
+	padding: 4px 8px;
+	border: 1px solid var(--ds-border);
+	border-radius: 4px;
+	background: var(--ds-surface);
+	color: var(--ds-text);
+}
+
+.ds-warning,
+.ds-impact p {
+	margin: 8px 0;
+	padding: 8px 10px;
+	border-radius: 4px;
+	background: #fff4e5;
+	color: #663c00;
+	font-size: 13px;
+}
+
+.ds-status {
+	min-height: 1.2em;
+	color: var(--ds-muted);
+}
+
+.ds-dialog-buttons {
+	display: flex;
+	justify-content: space-between;
+	margin-top: 12px;
+}
+
+@media (max-width: 700px) {
+	.ds-edit-pages {
+		display: none;
+	}
 }

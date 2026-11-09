@@ -35,6 +35,7 @@
 		return;
 	}
 	const handlers = cfg.handlers || {};
+	const editHandlers = cfg.editHandlers || {};
 
 	/**
 	 * @param {string} name File name or path
@@ -84,6 +85,38 @@
 	}
 
 	/**
+	 * Pencil « Edit » of a line, only on the lines where the user may delete the file (so may write in its directory):
+	 * the editor checks the permission again on the server
+	 * @param {HTMLAnchorElement} link Link of the name of the file
+	 * @param {Object} info Result of fileOfLink()
+	 */
+	function addEditLink(link, info) {
+		const editor = editHandlers[info.extension];
+		const line = link.closest('tr, li, .ecmjqft');
+		if (!editor || editor === cfg.noneHandler || !line || line.querySelector('.docstudio-edit')
+			|| !line.querySelector('a.deletefilelink, a[href*="action=delete"], a[href*="remove_file"]')) {
+			return;
+		}
+		const current = new URL(window.location.href);
+		current.searchParams.delete('uploadform');
+		const query = new URLSearchParams({ source: 'document', modulepart: info.modulepart, file: info.file, viewer: editor,
+			backtopage: current.pathname + current.search });
+		if (info.entity) {
+			query.set('entity', info.entity);
+		}
+		const edit = document.createElement('a');
+		edit.className = 'docstudio-edit paddingright marginleftonly';
+		edit.href = cfg.editUrl + '?' + query.toString();
+		edit.title = cfg.editLabel;
+		edit.setAttribute('aria-label', cfg.editLabel);
+		const icon = document.createElement('span');
+		icon.className = 'fa fa-pen pictofixedwidth docstudio-open-icon';
+		edit.appendChild(icon);
+		const after = line.querySelector('.docstudio-open') || link;
+		after.after(edit);
+	}
+
+	/**
 	 * Open the viewer in the preview dialog of Dolibarr (so that everything bound to it, like the unalterable log of
 	 * the previews of invoices, still works), or in a new tab when there is no dialog (phone layout)
 	 * @param {string} url
@@ -111,6 +144,12 @@
 			}
 			link.dataset.docstudio = '1';
 			const info = fileOfLink(link);
+			if (info && !link.classList.contains('documentpreview')) {
+				// After the magnifier of DocStudio when there is one (added below)
+				window.setTimeout(function () {
+					addEditLink(link, info);
+				}, 0);
+			}
 			const handler = info ? handlers[info.extension] : null;
 			if (!handler || handler === cfg.dolibarrHandler) {
 				return;

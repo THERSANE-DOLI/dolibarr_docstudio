@@ -244,6 +244,151 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 	}
 
 	/**
+	 * Same permission as uploading a file on the owner of the document (mode 'write' of document.php checks).
+	 * External users never write.
+	 *
+	 * @param User $fuser User
+	 * @return bool
+	 */
+	public function canWrite(User $fuser)
+	{
+		if ($this->fullPath === '' || !empty($fuser->socid)) {
+			return false;
+		}
+		$check = dol_check_secure_access_document($this->modulepart, $this->relativeFile, $this->entity, $fuser, '', 'write');
+
+		return is_array($check) && !empty($check['accessallowed']) && !empty($check['original_file'])
+			&& realpath((string) $check['original_file']) === realpath($this->fullPath);
+	}
+
+	/**
+	 * Name accepted for a copy: no directory, not hidden, same extension as the original, cleaned like an upload
+	 *
+	 * @param string $fileName Name asked
+	 * @return string          Clean name, '' if refused
+	 */
+	public function cleanCopyName($fileName)
+	{
+		$name = dol_sanitizeFileName(trim(basename(str_replace('\\', '/', (string) $fileName))));
+		$ext = $this->getExtension();
+		if ($name === '' || $name[0] === '.' || strlen($name) > 200 || !self::isSafeRelativePath($name)) {
+			return '';
+		}
+		// Only one extension, the one of the original: no « name.php.pdf » that a badly set web server could run
+		$base = (strtolower(pathinfo($name, PATHINFO_EXTENSION)) === $ext) ? substr($name, 0, -strlen($ext) - 1) : $name;
+		$base = trim(str_replace('.', '-', $base), '-');
+		if ($base === '') {
+			return '';
+		}
+
+		return $base.'.'.$ext;
+	}
+
+	/**
+	 * Save a new content: a copy next to the original (indexed in the ECM with the same owner) or the original
+	 * replaced in place (its ECM entry, and so its share link, are kept). The antivirus checks the new content first.
+	 *
+	 * @param string $tmpFile   Full path of the new content
+	 * @param string $mode      'copy' or 'replace'
+	 * @param string $fileName  Name of the copy
+	 * @param bool   $overwrite Overwrite a file of the same name (copy)
+	 * @param User   $fuser     User saving
+	 * @return array{result:int,error:string,exists:int,filename:string}
+	 */
+	public function save($tmpFile, $mode, $fileName, $overwrite, User $fuser)
+	{
+		global $langs;
+
+		$result = array('result' => -1, 'error' => '', 'exists' => 0, 'filename' => '');
+		if (!$this->canWrite($fuser)) {
+			$result['error'] = $langs->trans('DocStudioErrorCannotWrite');
+			return $result;
+		}
+		$virus = dolCheckVirus($tmpFile, $this->fullPath);
+		if (count($virus)) {
+			$result['error'] = $langs->trans('DocStudioErrorVirus');
+			dol_syslog(__METHOD__.' content refused by the antivirus: '.implode(', ', $virus), LOG_WARNING);
+			return $result;
+		}
+
+		$dir = dirname($this->fullPath);
+		if ($mode === 'replace') {
+			$target = $this->fullPath;
+		} else {
+			$name = $this->cleanCopyName($fileName);
+			if ($name === '') {
+				$result['error'] = $langs->trans('DocStudioErrorBadFileName');
+				return $result;
+			}
+			$target = $dir.'/'.$name;
+			if (file_exists($target) && !$overwrite) {
+				$result['result'] = 0;
+				$result['exists'] = 1;
+				$result['filename'] = $name;
+				return $result;
+			}
+			if (file_exists($target) && realpath($target) === realpath($this->fullPath)) {
+				$mode = 'replace';
+			}
+		}
+
+		// Written next to the target then renamed: the target is never half written
+		$work = $dir.'/.docstudio-'.bin2hex(random_bytes(8)).'.tmp';
+		if (!@copy($tmpFile, $work) || !@rename($work, $target)) {
+			@unlink($work);
+			$result['error'] = $langs->trans('DocStudioErrorSave');
+			return $result;
+		}
+		dolChmod($target);
+
+		$this->indexInEcm($target, $mode === 'replace', $fuser);
+		$result['result'] = 1;
+		$result['filename'] = basename($target);
+
+		return $result;
+	}
+
+	/**
+	 * ECM index of a saved file: entry of the original updated (checksum), or new entry with the owner of the original
+	 *
+	 * @param string $target   Full path of the saved file
+	 * @param bool   $replaced The original was replaced
+	 * @param User   $fuser    User saving
+	 * @return void
+	 */
+	protected function indexInEcm($target, $replaced, User $fuser)
+	{
+		include_once DOL_DOCUMENT_ROOT.'/ecm/class/ecmfiles.class.php';
+		$root = rtrim(DOL_DATA_ROOT, '/').'/';
+		$rel = preg_replace('/^'.preg_quote($root, '/').'/', '', $target);
+		$relSource = preg_replace('/^'.preg_quote($root, '/').'/', '', $this->fullPath);
+
+		$ecm = new EcmFiles($this->db);
+		if ($ecm->fetch(0, '', $rel) > 0) {
+			$ecm->label = md5_file($target);
+			$ecm->update($fuser);
+			return;
+		}
+		if ($replaced) {
+			return;
+		}
+		$source = new EcmFiles($this->db);
+		$ecm->filepath = dirname($rel);
+		$ecm->filename = basename($target);
+		$ecm->label = md5_file($target);
+		$ecm->fullpath_orig = basename($this->fullPath);
+		$ecm->gen_or_uploaded = 'uploaded';
+		$ecm->entity = $this->entity;
+		if ($source->fetch(0, '', $relSource) > 0) {
+			$ecm->src_object_type = $source->src_object_type;
+			$ecm->src_object_id = $source->src_object_id;
+		}
+		if ($ecm->create($fuser) < 0) {
+			dol_syslog(__METHOD__.' ECM index not created: '.$ecm->error, LOG_WARNING);
+		}
+	}
+
+	/**
 	 * URL of document.php for this file
 	 *
 	 * @return string

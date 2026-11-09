@@ -13,6 +13,9 @@ View the documents of Dolibarr without leaving it.
   - images (PNG, JPEG, GIF, WebP, BMP, AVIF, SVG);
   - CSV and TSV as a sortable table;
   - text files (TXT, LOG, JSON, XML, HTML source, EML source...).
+- PDF editor, without any server: annotations (text, drawing, highlight, image), pages (rotate, delete, reorder),
+  crop and redaction (pages redacted turned into images, result checked). Saved as a copy or instead of the
+  original, with the permission to change the documents of the object.
 - Same permissions as the download: a user who cannot download a file cannot view it.
 - Other modules can add viewers for other file types, and sources of files other than the documents of Dolibarr.
 
@@ -79,3 +82,4 @@ GPLv3 or (at your option) any later version. See file COPYING for more informati
 ### Embedded libraries
 
 - pdf.js 5.4.624 (Mozilla, Apache 2.0), in `vendor/pdfjs`.
+- pdf-lib 1.17.1 (Andrew Dillon, MIT), in `vendor/pdflib`.

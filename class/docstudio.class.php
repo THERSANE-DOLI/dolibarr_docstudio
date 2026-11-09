@@ -35,6 +35,12 @@ dol_include_once('/docstudio/class/docstudiodocumentprovider.class.php');
  */
 class DocStudio
 {
+	/** Action on a file: show it */
+	const ACTION_VIEW = 'view';
+
+	/** Action on a file: change it (editors) */
+	const ACTION_EDIT = 'edit';
+
 	/** Handler of a type: the preview of Dolibarr (document_preview of the core) */
 	const HANDLER_DOLIBARR = 'dolibarr';
 
@@ -118,6 +124,16 @@ class DocStudio
 			'maxsize' => self::MAX_TEXT_SIZE,
 		), 'docstudio');
 
+		$this->addViewer(array(
+			'code' => 'pdfedit',
+			'label' => $langs->trans('DocStudioEditorPdf'),
+			'extensions' => array('pdf'),
+			'script' => '/docstudio/js/editors/pdf.js',
+			'css' => '/docstudio/vendor/pdfjs/web/pdf_viewer.css',
+			'priority' => 50,
+			'mode' => self::ACTION_EDIT,
+		), 'docstudio');
+
 		if (!is_object($hookmanager)) {
 			include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
 			$hookmanager = new HookManager($this->db);
@@ -182,6 +198,7 @@ class DocStudio
 	 *                                    - css: optional style sheet, '/mymodule/css/viewer.css'
 	 *                                    - priority: optional, the highest is chosen by default (built-in: 10 to 50)
 	 *                                    - maxsize: optional, files bigger than this (bytes) are not offered
+	 *                                    - mode: 'view' (default) or 'edit' for an editor, which can save the file
 	 * @return bool                       False if the declaration is refused
 	 */
 	public function registerViewer(array $viewer)
@@ -213,6 +230,7 @@ class DocStudio
 			}
 		}
 		$css = isset($viewer['css']) ? (string) $viewer['css'] : '';
+		$mode = (isset($viewer['mode']) && $viewer['mode'] === self::ACTION_EDIT) ? self::ACTION_EDIT : self::ACTION_VIEW;
 		if (!preg_match('/^[a-z][a-z0-9_]{1,31}$/', $code) || isset($this->viewers[$code]) || empty($extensions)
 			|| in_array($code, array(self::HANDLER_DOLIBARR, self::HANDLER_NONE), true)
 			|| self::getModuleOfPath((string) $viewer['script'], '/\.js$/') !== $module
@@ -230,6 +248,7 @@ class DocStudio
 			'priority' => isset($viewer['priority']) ? (int) $viewer['priority'] : 0,
 			'maxsize' => isset($viewer['maxsize']) ? (int) $viewer['maxsize'] : 0,
 			'module' => $module,
+			'mode' => $mode,
 		);
 
 		return true;
@@ -281,14 +300,17 @@ class DocStudio
 	}
 
 	/**
-	 * Declared viewers, highest priority first
+	 * Declared viewers (or editors), highest priority first
 	 *
+	 * @param string $mode 'view' for the viewers, 'edit' for the editors
 	 * @return array<string,array<string,mixed>>
 	 */
-	public function getViewers()
+	public function getViewers($mode = self::ACTION_VIEW)
 	{
 		$this->load();
-		$viewers = $this->viewers;
+		$viewers = array_filter($this->viewers, function ($viewer) use ($mode) {
+			return $viewer['mode'] === $mode;
+		});
 		uasort($viewers, function ($a, $b) {
 			return $b['priority'] <=> $a['priority'];
 		});
@@ -301,12 +323,13 @@ class DocStudio
 	 *
 	 * @param string $extension Lowercase extension
 	 * @param int    $size      Size of the file in bytes
+	 * @param string $mode      'view' for the viewers, 'edit' for the editors
 	 * @return array<string,array<string,mixed>>
 	 */
-	public function getViewersFor($extension, $size)
+	public function getViewersFor($extension, $size, $mode = self::ACTION_VIEW)
 	{
 		$result = array();
-		foreach ($this->getViewers() as $code => $viewer) {
+		foreach ($this->getViewers($mode) as $code => $viewer) {
 			if (in_array($extension, $viewer['extensions'], true) && (empty($viewer['maxsize']) || $size <= $viewer['maxsize'])) {
 				$result[$code] = $viewer;
 			}
@@ -316,18 +339,50 @@ class DocStudio
 	}
 
 	/**
-	 * Every extension that at least one viewer can show
+	 * Every extension that at least one viewer can show (or one editor can change)
 	 *
+	 * @param string $mode 'view' for the viewers, 'edit' for the editors
 	 * @return string[]
 	 */
-	public function getSupportedExtensions()
+	public function getSupportedExtensions($mode = self::ACTION_VIEW)
 	{
 		$list = array();
-		foreach ($this->getViewers() as $viewer) {
+		foreach ($this->getViewers($mode) as $viewer) {
 			$list = array_merge($list, $viewer['extensions']);
 		}
 
 		return array_values(array_unique($list));
+	}
+
+	/**
+	 * Content saved by an editor is really of the type of the file (never trusted from the browser)
+	 *
+	 * @param string $extension Lowercase extension of the file
+	 * @param string $file      Full path of the content
+	 * @return bool
+	 */
+	public static function isValidContent($extension, $file)
+	{
+		$size = @filesize($file);
+		if (!$size) {
+			return false;
+		}
+		$fh = @fopen($file, 'rb');
+		if (!$fh) {
+			return false;
+		}
+		$head = (string) fread($fh, 1024);
+		fseek($fh, max(0, $size - 2048));
+		$tail = (string) fread($fh, 2048);
+		fclose($fh);
+
+		if ($extension === 'pdf') {
+			// Header at the very start (no HTML or script before) and end of file marker
+			return strncmp($head, '%PDF-', 5) === 0 && strpos($tail, '%%EOF') !== false;
+		}
+
+		// No other type can be saved yet
+		return false;
 	}
 
 	/**
@@ -355,40 +410,43 @@ class DocStudio
 	}
 
 	/**
-	 * Ways to open a file type: the viewers able to show it, the preview of Dolibarr when the core can show it, or
-	 * no preview (download only)
+	 * Ways to open (or change) a file type:
+	 * - view: the viewers able to show it, the preview of Dolibarr when the core can show it, or no preview (download);
+	 * - edit: the editors able to change it, or no editing.
 	 *
 	 * @param string $extension Lowercase extension
+	 * @param string $action    'view' or 'edit'
 	 * @return array<string,string> Handler code => label
 	 */
-	public function getHandlersFor($extension)
+	public function getHandlersFor($extension, $action = self::ACTION_VIEW)
 	{
 		global $langs;
 
 		$handlers = array();
-		foreach ($this->getViewers() as $code => $viewer) {
+		foreach ($this->getViewers($action) as $code => $viewer) {
 			if (in_array($extension, $viewer['extensions'], true)) {
 				$handlers[$code] = $langs->trans('DocStudioHandlerViewer', $viewer['label']);
 			}
 		}
-		if (dolIsAllowedForPreview('file.'.$extension)) {
+		if ($action === self::ACTION_VIEW && dolIsAllowedForPreview('file.'.$extension)) {
 			$handlers[self::HANDLER_DOLIBARR] = $langs->trans('DocStudioHandlerDolibarr');
 		}
-		$handlers[self::HANDLER_NONE] = $langs->trans('DocStudioHandlerNone');
+		$handlers[self::HANDLER_NONE] = $langs->trans($action === self::ACTION_EDIT ? 'DocStudioHandlerNoEdit' : 'DocStudioHandlerNone');
 
 		return $handlers;
 	}
 
 	/**
-	 * Handler used when the administrator chose nothing: the preview of Dolibarr when the core can show the type
-	 * (PDF, images...), else the viewer of highest priority
+	 * Handler used when the administrator chose nothing: for viewing, the preview of Dolibarr when the core can show
+	 * the type (PDF, images...), else the viewer of highest priority; for editing, the editor of highest priority
 	 *
 	 * @param string $extension Lowercase extension
+	 * @param string $action    'view' or 'edit'
 	 * @return string           Handler code
 	 */
-	public function getDefaultHandler($extension)
+	public function getDefaultHandler($extension, $action = self::ACTION_VIEW)
 	{
-		$handlers = $this->getHandlersFor($extension);
+		$handlers = $this->getHandlersFor($extension, $action);
 		if (isset($handlers[self::HANDLER_DOLIBARR])) {
 			return self::HANDLER_DOLIBARR;
 		}
@@ -401,25 +459,27 @@ class DocStudio
 	 *
 	 * @param string $extension Lowercase extension
 	 * @param string $suffix    '' for the handler, '_CHOICES' for the handlers left to the choice of the users
+	 * @param string $action    'view' or 'edit'
 	 * @return string
 	 */
-	public static function getConstName($extension, $suffix = '')
+	public static function getConstName($extension, $suffix = '', $action = self::ACTION_VIEW)
 	{
-		return 'DOCSTUDIO_VIEW_'.strtoupper(preg_replace('/[^a-z0-9]/', '', $extension)).$suffix;
+		return 'DOCSTUDIO_'.($action === self::ACTION_EDIT ? 'EDIT' : 'VIEW').'_'.strtoupper(preg_replace('/[^a-z0-9]/', '', $extension)).$suffix;
 	}
 
 	/**
 	 * Handler chosen by the administrator for a type (the default one if the choice is no longer available)
 	 *
 	 * @param string $extension Lowercase extension
+	 * @param string $action    'view' or 'edit'
 	 * @return string           Handler code
 	 */
-	public function getAdminHandler($extension)
+	public function getAdminHandler($extension, $action = self::ACTION_VIEW)
 	{
-		$handlers = $this->getHandlersFor($extension);
-		$chosen = getDolGlobalString(self::getConstName($extension));
+		$handlers = $this->getHandlersFor($extension, $action);
+		$chosen = getDolGlobalString(self::getConstName($extension, '', $action));
 
-		return isset($handlers[$chosen]) ? $chosen : $this->getDefaultHandler($extension);
+		return isset($handlers[$chosen]) ? $chosen : $this->getDefaultHandler($extension, $action);
 	}
 
 	/**
@@ -427,14 +487,15 @@ class DocStudio
 	 * Only one handler means no choice for the users.
 	 *
 	 * @param string $extension Lowercase extension
+	 * @param string $action    'view' or 'edit'
 	 * @return string[]         Handler codes
 	 */
-	public function getUserChoices($extension)
+	public function getUserChoices($extension, $action = self::ACTION_VIEW)
 	{
-		$handlers = $this->getHandlersFor($extension);
-		$admin = $this->getAdminHandler($extension);
+		$handlers = $this->getHandlersFor($extension, $action);
+		$admin = $this->getAdminHandler($extension, $action);
 		$choices = array($admin);
-		foreach (explode(',', getDolGlobalString(self::getConstName($extension, '_CHOICES'))) as $code) {
+		foreach (explode(',', getDolGlobalString(self::getConstName($extension, '_CHOICES', $action))) as $code) {
 			if ($code !== '' && isset($handlers[$code]) && !in_array($code, $choices, true)) {
 				$choices[] = $code;
 			}
@@ -448,13 +509,14 @@ class DocStudio
 	 *
 	 * @param string    $extension Lowercase extension
 	 * @param User|null $fuser     User, null for the administrator choice only
+	 * @param string    $action    'view' or 'edit'
 	 * @return string              Handler code
 	 */
-	public function getHandler($extension, $fuser = null)
+	public function getHandler($extension, $fuser = null, $action = self::ACTION_VIEW)
 	{
-		$choices = $this->getUserChoices($extension);
+		$choices = $this->getUserChoices($extension, $action);
 		if ($fuser !== null && count($choices) > 1) {
-			$name = self::getConstName($extension);
+			$name = self::getConstName($extension, '', $action);
 			$mine = (isset($fuser->conf->$name) ? (string) $fuser->conf->$name : '');
 			if (in_array($mine, $choices, true)) {
 				return $mine;
@@ -465,30 +527,32 @@ class DocStudio
 	}
 
 	/**
-	 * Handler of every type a viewer can show, for a user
+	 * Handler of every type a viewer can show (or an editor can change), for a user
 	 *
-	 * @param User|null $fuser User
+	 * @param User|null $fuser  User
+	 * @param string    $action 'view' or 'edit'
 	 * @return array<string,string> Extension => handler code
 	 */
-	public function getHandlers($fuser = null)
+	public function getHandlers($fuser = null, $action = self::ACTION_VIEW)
 	{
 		$result = array();
-		foreach ($this->getSupportedExtensions() as $extension) {
-			$result[$extension] = $this->getHandler($extension, $fuser);
+		foreach ($this->getSupportedExtensions($action) as $extension) {
+			$result[$extension] = $this->getHandler($extension, $fuser, $action);
 		}
 
 		return $result;
 	}
 
 	/**
-	 * Types a viewer can show, grouped by family then sorted
+	 * Types a viewer can show (or an editor can change), grouped by family then sorted
 	 *
+	 * @param string $action 'view' or 'edit'
 	 * @return array<string,string[]> Family => extensions
 	 */
-	public function getExtensionsByFamily()
+	public function getExtensionsByFamily($action = self::ACTION_VIEW)
 	{
 		$result = array('pdf' => array(), 'image' => array(), 'table' => array(), 'text' => array(), 'other' => array());
-		foreach ($this->getSupportedExtensions() as $extension) {
+		foreach ($this->getSupportedExtensions($action) as $extension) {
 			$result[self::getFamily($extension)][] = $extension;
 		}
 		foreach ($result as $family => $list) {
