@@ -2,6 +2,9 @@
 
 ## 0.7
 
+- FIX: PDF editor, active page marked by a deeper shadow only, without outline :   0.7.1
+  - the outline stays for the preview of the page actions (mouse on rotate or delete)
+
 - NEW: PDF editor, active page shown: the page the rotation and the deletion apply to :   0.7.0
   - outline and shadow on the active page (the one filling the view, or the one clicked with the Select tool),
     same outline on its thumbnail, « Page 3 / 4 » in the top bar
