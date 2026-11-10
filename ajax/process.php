@@ -130,6 +130,14 @@ $maxSize = min(getDolGlobalInt('DOCSTUDIO_MAX_SAVE_SIZE', 104857600), DocStudioP
 if ((int) $upload['size'] <= 0 || (int) $upload['size'] > $maxSize) {
 	docstudioProcessError($langs->transnoentitiesnoconv('DocStudioErrorTooBig'), 400);
 }
+// One compression at a time for a user and a few for the instance, taken before the checks that read the file
+// (antivirus, Ghostscript: audit DSTU-013, DSTU-020)
+$userLock = DocStudioPdfTools::lockUser((int) $user->id);
+$slotLock = $userLock !== false ? DocStudioPdfTools::lockSlot() : false;
+if ($userLock === false || $slotLock === false) {
+	@unlink($upload['tmp_name']);
+	docstudioProcessError($langs->transnoentitiesnoconv('DocStudioErrorCompressBusy'), 429);
+}
 if (!DocStudio::isValidContent($extension, $upload['tmp_name'])) {
 	docstudioProcessError($langs->transnoentitiesnoconv('DocStudioErrorBadContent'), 400);
 }
@@ -140,12 +148,6 @@ if (count($virus)) {
 	dol_syslog('docstudio/ajax/process.php content refused by the antivirus: '.implode(', ', $virus), LOG_WARNING);
 	docstudioProcessError($langs->transnoentitiesnoconv('DocStudioErrorVirus'), 403);
 }
-$userLock = DocStudioPdfTools::lockUser((int) $user->id);
-if ($userLock === false) {
-	@unlink($upload['tmp_name']);
-	docstudioProcessError($langs->transnoentitiesnoconv('DocStudioErrorCompressBusy'), 429);
-}
-
 $tools = new DocStudioPdfTools();
 $result = $tools->compress($upload['tmp_name'], $level);
 if ($result === false || !DocStudio::isValidContent($extension, $result)) {

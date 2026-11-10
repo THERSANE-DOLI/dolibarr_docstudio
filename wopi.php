@@ -300,7 +300,7 @@ if (!$contents) {
 		if ($override === 'REFRESH_LOCK' && $current !== $lock) {
 			docstudioWopiAnswer(409, null, array('X-WOPI-Lock' => $current));
 		}
-		DocStudioWopi::setLock($fileId, $lock);
+		DocStudioWopi::setLock($fileId, $lock, (int) $wuser->id);
 		docstudioWopiAnswer(200, null, array('X-WOPI-ItemVersion' => $version));
 	}
 	if ($override === 'UNLOCK') {

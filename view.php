@@ -86,6 +86,13 @@ if ($provider === null) {
 
 $title = $provider !== null ? $provider->getFileName() : $langs->trans('DocStudio');
 $viewers = $provider !== null ? $registry->getViewersFor($provider->getExtension(), $provider->getSize()) : array();
+// The desktop Office never for a received attachment nor a type with macros (audit DSTU-018)
+if ($provider !== null) {
+	dol_include_once('/docstudio/class/docstudiodesktop.class.php');
+	if (!DocStudioDesktop::isAllowedFor($source, $provider->getExtension())) {
+		unset($viewers['desktop'], $viewers['desktopedit']);
+	}
+}
 // « Open with »: the viewers the administrator allows for this type; all of them when none is allowed (direct opening
 // by another module, like the attachments of a mail)
 $defaultViewer = '';

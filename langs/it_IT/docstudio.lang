@@ -344,7 +344,7 @@ DocStudioNoInstanceKey = L'identificativo unico dell'istanza ($dolibarr_main_ins
 
 # Copy filed in a piece (attachment of a mail, inbox C2)
 DocStudioSaveTo = Salva una copia in %s
-DocStudioErrorCompressBusy = Una compressione è già in corso per te: attendi che finisca, poi salva di nuovo.
+DocStudioErrorCompressBusy = Una compressione è già in corso (per te o sul server): riprova tra un istante.
 DocStudioGhostscriptProblemNotset = Ghostscript non è impostato.
 DocStudioGhostscriptProblemName = Il percorso deve indicare l'eseguibile di Ghostscript (gs, o gswin64c / gswin32c su Windows), fuori dalla cartella dei documenti di Dolibarr.
 DocStudioGhostscriptProblemMissing = Questo file non esiste o non è eseguibile sul server di Dolibarr.

@@ -87,6 +87,8 @@ class ActionsDocStudio extends CommonHookActions
 			if (count($allowed)) {
 				$viewers = $allowed;
 			}
+			// A received attachment never goes to the desktop Office (audit DSTU-018)
+			unset($viewers['desktop'], $viewers['desktopedit']);
 			foreach ($viewers as $code => $viewer) {
 				$out[(int) $part][] = array(
 					'code' => $code,

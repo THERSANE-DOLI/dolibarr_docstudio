@@ -174,6 +174,10 @@ if (!hash_equals((string) $data['f'], $fileId)) {
 	docstudioDavAnswer(404);
 }
 $fileName = $provider->getFileName();
+// Never a received attachment nor a type with macros (audit DSTU-018), even with a token made before
+if (!DocStudioDesktop::isAllowedFor((string) $data['s'], $provider->getExtension())) {
+	docstudioDavAnswer(404);
+}
 // Office may encode the name its own way: compared decoded
 if (!$isFolder && rawurldecode($askedName) !== $fileName) {
 	docstudioDavAnswer(404);
@@ -185,7 +189,10 @@ $etag = $modified.'-'.$provider->getSize();
 $current = DocStudioWopi::getLock($fileId);
 // Lock tokens sent by Office (If and Lock-Token headers)
 $sentLocks = DocStudioDesktop::parseLockTokens((isset($_SERVER['HTTP_IF']) ? (string) $_SERVER['HTTP_IF'] : '').' '.(isset($_SERVER['HTTP_LOCK_TOKEN']) ? (string) $_SERVER['HTTP_LOCK_TOKEN'] : ''));
-$holdsLock = $current !== '' && in_array(strtolower($current), $sentLocks, true);
+// Held by the caller: its token and the same user (a lock taken by another user is never given nor lifted, DSTU-017)
+$lockOwner = DocStudioWopi::getLockOwner($fileId);
+$ownLock = $current !== '' && ($lockOwner === 0 || $lockOwner === (int) $wuser->id);
+$holdsLock = $ownLock && in_array(strtolower($current), $sentLocks, true);
 $folderHref = preg_replace('#/[^/]*$#', '/', (string) parse_url(isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '', PHP_URL_PATH));
 if ($isFolder) {
 	$folderHref = (string) parse_url((string) $_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -202,7 +209,8 @@ if ($method === 'OPTIONS') {
 
 if ($method === 'PROPFIND') {
 	$depth = isset($_SERVER['HTTP_DEPTH']) && $_SERVER['HTTP_DEPTH'] === '0' ? 0 : 1;
-	docstudioDavAnswer(207, DocStudioDesktop::propfindXml($folderHref, $fileName, $provider->getSize(), $modified, $etag, $isFolder, $depth, $current, $canWrite));
+	// The lock token only to its holder (with a token for editing): the others see that the file is locked
+	docstudioDavAnswer(207, DocStudioDesktop::propfindXml($folderHref, $fileName, $provider->getSize(), $modified, $etag, $isFolder, $depth, $current, $canWrite, $canWrite && $ownLock));
 }
 
 if ($isFolder) {
@@ -274,7 +282,7 @@ if ($method === 'LOCK') {
 		}
 		$lock = $current !== '' ? $current : DocStudioDesktop::newLockToken();
 	}
-	if (!DocStudioWopi::setLock($fileId, $lock)) {
+	if (!DocStudioWopi::setLock($fileId, $lock, (int) $wuser->id)) {
 		docstudioDavAnswer(500);
 	}
 	$owner = '';
@@ -289,6 +297,9 @@ if ($method === 'LOCK') {
 }
 
 if ($method === 'UNLOCK') {
+	if (!$canWrite) {
+		docstudioDavAnswer(403);
+	}
 	if ($current === '') {
 		docstudioDavAnswer(204);
 	}

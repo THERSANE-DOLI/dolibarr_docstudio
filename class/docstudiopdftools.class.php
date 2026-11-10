@@ -165,6 +165,32 @@ class DocStudioPdfTools
 	}
 
 	/**
+	 * A place among the compressions running on the instance (DOCSTUDIO_MAX_COMPRESS_PARALLEL, 2 by default, audit
+	 * DSTU-020): lock held until the end of the request
+	 *
+	 * @return resource|false Handle of the lock, false when every place is taken
+	 */
+	public static function lockSlot()
+	{
+		$dir = DOL_DATA_ROOT.'/docstudio/temp';
+		if (dol_mkdir($dir) < 0) {
+			return false;
+		}
+		$places = max(1, min(16, getDolGlobalInt('DOCSTUDIO_MAX_COMPRESS_PARALLEL', 2)));
+		for ($i = 0; $i < $places; $i++) {
+			$fh = @fopen($dir.'/compress-slot-'.$i.'.lock', 'c');
+			if ($fh !== false && flock($fh, LOCK_EX | LOCK_NB)) {
+				return $fh;
+			}
+			if ($fh !== false) {
+				fclose($fh);
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * One compression at a time for a user (audit DSTU-013): lock held until the end of the request
 	 *
 	 * @param int $userId

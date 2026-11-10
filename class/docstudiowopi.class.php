@@ -200,10 +200,11 @@ class DocStudioWopi
 			@file_put_contents($cache, json_encode($data));
 		}
 		// Remembered: once the office server has signed its calls, a discovery without key is refused (wopi.php)
-		if (count($data['proof']) && getDolGlobalString('DOCSTUDIO_WOPI_PROOF_SEEN') !== self::serverHash()) {
-			global $conf;
+		// For the whole instance (entity 0), one setting per office server: the cache of the discovery is common to
+		// the entities, a purge during an outage must not let an entity accept a token alone (audit DSTU-021)
+		if (count($data['proof']) && !self::isProofExpected()) {
 			require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
-			dolibarr_set_const($GLOBALS['db'], 'DOCSTUDIO_WOPI_PROOF_SEEN', self::serverHash(), 'chaine', 0, '', $conf->entity);
+			dolibarr_set_const($GLOBALS['db'], self::proofSeenConst(), '1', 'chaine', 0, '', 0);
 		}
 
 		return $data;
@@ -224,7 +225,16 @@ class DocStudioWopi
 	 */
 	public static function isProofExpected()
 	{
-		return getDolGlobalString('DOCSTUDIO_WOPI_PROOF_SEEN') === self::serverHash();
+		// Former setting of an entity (0.18.1) still read
+		return getDolGlobalInt(self::proofSeenConst()) === 1 || getDolGlobalString('DOCSTUDIO_WOPI_PROOF_SEEN') === self::serverHash();
+	}
+
+	/**
+	 * @return string Name of the setting « this office server signs its calls », for the whole instance
+	 */
+	protected static function proofSeenConst()
+	{
+		return 'DOCSTUDIO_WOPI_PROOF_SEEN_'.strtoupper(substr(self::serverHash(), 0, 12));
 	}
 
 	/**
@@ -535,6 +545,14 @@ class DocStudioWopi
 	}
 
 	/**
+	 * @return string Key of the hash of the address of a computer (dav tokens), derived from the secret of the tokens
+	 */
+	public static function ipKey()
+	{
+		return hash_hmac('sha256', 'ip', self::key(), true);
+	}
+
+	/**
 	 * @return int Seconds
 	 */
 	public static function getTokenTtl()
@@ -619,24 +637,47 @@ class DocStudioWopi
 	 */
 	public static function getLock($fileId)
 	{
+		$data = self::readLock($fileId);
+
+		return $data === null ? '' : (string) $data['lock'];
+	}
+
+	/**
+	 * @param string $fileId
+	 * @return int User who holds the lock, 0 when none or unknown (lock of an older version)
+	 */
+	public static function getLockOwner($fileId)
+	{
+		$data = self::readLock($fileId);
+
+		return $data === null || !isset($data['user']) ? 0 : (int) $data['user'];
+	}
+
+	/**
+	 * @param string $fileId
+	 * @return array<string,mixed>|null
+	 */
+	protected static function readLock($fileId)
+	{
 		$file = self::lockFile($fileId);
 		if (!is_readable($file)) {
-			return '';
+			return null;
 		}
 		$data = json_decode((string) file_get_contents($file), true);
 		if (!is_array($data) || empty($data['lock']) || (int) $data['expire'] < dol_now()) {
-			return '';
+			return null;
 		}
 
-		return (string) $data['lock'];
+		return $data;
 	}
 
 	/**
 	 * @param string $fileId
 	 * @param string $lock   '' removes the lock
+	 * @param int    $userId User holding the lock
 	 * @return bool
 	 */
-	public static function setLock($fileId, $lock)
+	public static function setLock($fileId, $lock, $userId = 0)
 	{
 		$file = self::lockFile($fileId);
 		if ($lock === '') {
@@ -646,7 +687,8 @@ class DocStudioWopi
 			return false;
 		}
 
-		return @file_put_contents($file, json_encode(array('lock' => $lock, 'expire' => dol_now() + self::LOCK_TTL)), LOCK_EX) !== false;
+		// The holder is kept: only him sees the lock token and may unlock (audit DSTU-017)
+		return @file_put_contents($file, json_encode(array('lock' => $lock, 'expire' => dol_now() + self::LOCK_TTL, 'user' => (int) $userId)), LOCK_EX) !== false;
 	}
 
 	/**

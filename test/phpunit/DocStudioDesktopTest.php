@@ -121,4 +121,24 @@ class DocStudioDesktopTest extends TestCase
 		}
 		$this->assertTrue(DocStudioWopi::hasKey());
 	}
+
+	/**
+	 * Never a received attachment nor a type with macros (audit DSTU-018); the lock token only to its holder (DSTU-017)
+	 *
+	 * @return void
+	 */
+	public function testRestrictions()
+	{
+		$this->assertTrue(DocStudioDesktop::isAllowedFor('document', 'xlsx'));
+		$this->assertFalse(DocStudioDesktop::isAllowedFor('inbox', 'xlsx'), 'Received attachment');
+		foreach (array('xlsm', 'docm', 'pptm', 'doc', 'xls', 'ppt', 'xlsb') as $ext) {
+			$this->assertFalse(DocStudioDesktop::isAllowedFor('document', $ext), $ext.' may hold macros');
+			$this->assertNotContains($ext, DocStudioDesktop::getExtensions('view'));
+		}
+		$lock = 'opaquelocktoken:abc';
+		$hidden = DocStudioDesktop::propfindXml('/dav.php/1/t/a.xlsx', 'a.xlsx', 10, 1700000000, '1-10', false, 0, $lock, true, false);
+		$this->assertStringNotContainsString($lock, $hidden, 'Locked by someone else: token not given');
+		$this->assertStringContainsString('activelock', $hidden, 'But the file is shown locked');
+		$this->assertNotSame(DocStudioDesktop::ipHash('192.0.2.1'), substr(hash('sha256', 'docstudio-dav|192.0.2.1'), 0, 16), 'Keyed hash');
+	}
 }

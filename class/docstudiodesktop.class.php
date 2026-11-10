@@ -41,6 +41,15 @@ class DocStudioDesktop
 		'ppt' => 'ms-powerpoint', 'pptx' => 'ms-powerpoint', 'pptm' => 'ms-powerpoint', 'pps' => 'ms-powerpoint', 'ppsx' => 'ms-powerpoint', 'pot' => 'ms-powerpoint', 'potx' => 'ms-powerpoint', 'odp' => 'ms-powerpoint',
 	);
 
+	/**
+	 * Types that may hold macros: never opened by the desktop Office through a link of the server (no « Mark of the
+	 * Web », the Protected View and the blocking of macros from Internet would not apply, audit DSTU-018)
+	 */
+	const MACRO_EXTENSIONS = array('doc', 'docm', 'dot', 'dotm', 'xls', 'xlsm', 'xlsb', 'xlt', 'xltm', 'ppt', 'pptm', 'pps', 'ppsm', 'pot', 'potm');
+
+	/** Sources whose files come from outside (attachments received): never opened by the desktop Office */
+	const EXTERNAL_SOURCES = array('inbox');
+
 	/** Types written back: ZIP packages only, checked like the office server (no macro file: docm, xlsm, pptm) */
 	const WRITABLE_EXTENSIONS = array('docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp');
 
@@ -76,9 +85,22 @@ class DocStudioDesktop
 	public static function getExtensions($action)
 	{
 		$list = $action === 'edit' ? self::WRITABLE_EXTENSIONS : array_keys(self::SCHEMES);
+		$list = array_values(array_diff($list, self::MACRO_EXTENSIONS));
 		sort($list);
 
 		return $list;
+	}
+
+	/**
+	 * The desktop Office may open this file: not a received attachment, not a type with macros
+	 *
+	 * @param string $source
+	 * @param string $extension
+	 * @return bool
+	 */
+	public static function isAllowedFor($source, $extension)
+	{
+		return !in_array($source, self::EXTERNAL_SOURCES, true) && !in_array(strtolower($extension), self::MACRO_EXTENSIONS, true) && isset(self::SCHEMES[strtolower($extension)]);
 	}
 
 	/**
@@ -100,7 +122,8 @@ class DocStudioDesktop
 	 */
 	public static function ipHash($ip)
 	{
-		return substr(hash('sha256', 'docstudio-dav|'.$ip), 0, 16);
+		// Keyed with the secret of the tokens: not computable from outside (audit DSTU-019)
+		return substr(hash_hmac('sha256', 'docstudio-dav|'.$ip, DocStudioWopi::ipKey()), 0, 16);
 	}
 
 	/**
@@ -191,9 +214,10 @@ class DocStudioDesktop
 	 * @param int    $depth      0 or 1
 	 * @param string $lock       Lock in place ('' when none)
 	 * @param bool   $canWrite
+	 * @param bool   $showLockToken The token of the lock is given (to its holder only)
 	 * @return string XML
 	 */
-	public static function propfindXml($folderHref, $fileName, $size, $modified, $etag, $isFolder, $depth, $lock, $canWrite)
+	public static function propfindXml($folderHref, $fileName, $size, $modified, $etag, $isFolder, $depth, $lock, $canWrite, $showLockToken = true)
 	{
 		$extension = strtolower(pathinfo($fileName, PATHINFO_EXTENSION));
 		$mime = isset(self::MIME_TYPES[$extension]) ? self::MIME_TYPES[$extension] : 'application/octet-stream';
@@ -209,7 +233,7 @@ class DocStudioDesktop
 		if ($lock !== '') {
 			$lockXml = '<D:activelock><D:locktype><D:write/></D:locktype><D:lockscope><D:exclusive/></D:lockscope>'
 				.'<D:depth>0</D:depth><D:timeout>Second-'.DocStudioWopi::LOCK_TTL.'</D:timeout>'
-				.'<D:locktoken><D:href>'.$esc($lock).'</D:href></D:locktoken></D:activelock>';
+				.($showLockToken ? '<D:locktoken><D:href>'.$esc($lock).'</D:href></D:locktoken>' : '').'</D:activelock>';
 		}
 		$file = '<D:response><D:href>'.$esc($folderHref.rawurlencode($fileName)).'</D:href><D:propstat><D:prop>'
 			.'<D:displayname>'.$esc($fileName).'</D:displayname><D:resourcetype/>'

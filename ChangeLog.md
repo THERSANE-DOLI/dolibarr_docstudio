@@ -2,6 +2,15 @@
 
 ## 0.19
 
+- FIX: security audit 2026-11-10-c, points DSTU-017 to DSTU-021 :   0.19.2
+  - desktop Office (dav.php): a lock is held by its user, its token never given to the others (they see the file
+    locked, Office opens it read only), lock and unlock with a token for editing only
+  - desktop Office never offered for a received attachment (inbox) nor for the types that may hold macros (doc,
+    docm, dot, xls, xlsm, xlsb, xlt, ppt, pptm, pps, pot), refused by dav.php too
+  - hash of the address of the computer in the dav tokens keyed with the secret of the tokens
+  - compression: places taken before the antivirus, 2 at a time for the instance (DOCSTUDIO_MAX_COMPRESS_PARALLEL)
+  - office server: « its calls are signed » remembered for the whole instance (multicompany)
+
 - FIX: security audit 2026-11-10-b, points DSTU-012 to DSTU-015 :   0.19.1
   - Ghostscript: only an executable named gs (gswin64c / gswin32c on Windows), outside of the documents of Dolibarr,
     and allowed by $dolibarr_main_restrict_os_commands of conf.php (add « gs » to this list); the Test button says why
