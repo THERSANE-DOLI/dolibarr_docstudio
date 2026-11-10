@@ -2,6 +2,12 @@
 
 ## 0.11
 
+- FIX: same checks as document.php of Dolibarr 24 (security audit) :   0.11.1
+  - check per object (checkUserAccessToDocumentObject): a user restricted to his own customers can no longer view
+    nor edit the documents of the other thirdparties
+  - hook downloadDocument called before the content is sent: the modules refusing or logging the downloads see the
+    files opened in DocStudio too
+
 - NEW: image editor, cutout (remove the background), taken over from Creative Banners :   0.11.0
   - tool « Remove the background » (W) with 4 modes: wand (click on the background, the pixels of its color around
     are removed, click again to bring them back, own tolerance per point), eraser and restore brushes (size,

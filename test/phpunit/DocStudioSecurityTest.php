@@ -196,6 +196,58 @@ class DocStudioSecurityTest extends TestCase
 	}
 
 	/**
+	 * Internal user restricted to his own customers (no « see all customers »): documents of a thirdparty he is not
+	 * the sales representative of are refused in reading and writing, like document.php of Dolibarr 24
+	 * (checkUserAccessToDocumentObject). Before Dolibarr 24 the function does not exist: same result as document.php.
+	 *
+	 * @return void
+	 */
+	public function testRestrictedSalesRepresentative()
+	{
+		global $db, $conf, $user;
+
+		$socid = (int) $db->getRow("SELECT rowid FROM ".$db->prefix()."societe ORDER BY rowid")->rowid;
+		$dir = $conf->societe->multidir_output[$conf->entity].'/'.$socid;
+		dol_mkdir($dir);
+		file_put_contents($dir.'/docstudio-test.txt', "restricted\n");
+		$params = array('modulepart' => 'societe', 'file' => $socid.'/docstudio-test.txt');
+
+		$restricted = new User($db);
+		$restricted->id = 999997;
+		$restricted->admin = 0;
+		$restricted->socid = 0;
+		$restricted->rights = new stdClass();
+		$restricted->rights->societe = new stdClass();
+		$restricted->rights->societe->lire = 1;
+		$restricted->rights->societe->creer = 1;
+		$restricted->rights->societe->client = new stdClass();
+		$restricted->rights->societe->client->voir = 0;
+
+		try {
+			$withCheck = function_exists('checkUserAccessToDocumentObject');
+			list($res, $provider) = $this->load($params, $restricted);
+			$this->assertSame($withCheck ? -1 : 1, $res, $provider->error);
+
+			// Same user allowed to see all customers
+			$restricted->rights->societe->client->voir = 1;
+			list($res, $provider) = $this->load($params, $restricted);
+			$this->assertSame(1, $res, $provider->error);
+			$this->assertTrue($provider->canWrite($restricted));
+
+			// Writing checked per object too (file loaded by the administrator)
+			$restricted->rights->societe->client->voir = 0;
+			list($res, $provider) = $this->load($params, $user);
+			$this->assertSame(1, $res, $provider->error);
+			$this->assertSame(!$withCheck, $provider->canWrite($restricted));
+
+			// No module refuses the download on the test instance
+			$this->assertTrue($provider->runDownloadHooks($user));
+		} finally {
+			@unlink($dir.'/docstudio-test.txt');
+		}
+	}
+
+	/**
 	 * External users with the permission of DocStudio: documents of their own thirdparty only, and only for a
 	 * modulepart where the owner is known
 	 *

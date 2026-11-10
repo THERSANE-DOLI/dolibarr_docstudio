@@ -97,6 +97,10 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 		if (!empty($fuser->socid) && !$this->isOwnThirdpartyDocument($fuser, isset($check['sqlprotectagainstexternals']) ? (string) $check['sqlprotectagainstexternals'] : '')) {
 			return $this->refuse('thirdparty', $fuser);
 		}
+		// Check per object of document.php since Dolibarr 24 (restricted sales representatives...)
+		if (function_exists('checkUserAccessToDocumentObject') && !checkUserAccessToDocumentObject($fuser, $this->modulepart, $this->relativeFile, 'read')) {
+			return $this->refuse('object', $fuser);
+		}
 
 		$path = (string) $check['original_file'];
 		if (preg_match('/\.\.|[<>|]/', $path) || !is_file($path) || !is_readable($path)) {
@@ -116,7 +120,7 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 	/**
 	 * Refuse the file: the reason is logged, and shown to administrators only (support without access to the logs)
 	 *
-	 * @param string $reason Code of the check that failed: entity, permission, thirdparty or dataroot
+	 * @param string $reason Code of the check that failed: entity, permission, thirdparty, object or dataroot
 	 * @param User   $fuser  User asking for the file
 	 * @return int           -1
 	 */
@@ -293,9 +297,45 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 			return false;
 		}
 		$check = dol_check_secure_access_document($this->modulepart, $this->relativeFile, $this->entity, $fuser, '', 'write');
+		if (!is_array($check) || empty($check['accessallowed']) || empty($check['original_file'])
+			|| realpath((string) $check['original_file']) !== realpath($this->fullPath)) {
+			return false;
+		}
 
-		return is_array($check) && !empty($check['accessallowed']) && !empty($check['original_file'])
-			&& realpath((string) $check['original_file']) === realpath($this->fullPath);
+		return !function_exists('checkUserAccessToDocumentObject') || checkUserAccessToDocumentObject($fuser, $this->modulepart, $this->relativeFile, 'write');
+	}
+
+	/**
+	 * Hook downloadDocument of document.php, so that the modules refusing or logging the downloads see this reading too
+	 *
+	 * @param User $fuser User reading the file
+	 * @return bool       False if a module refused (error in $this->error)
+	 */
+	public function runDownloadHooks(User $fuser)
+	{
+		global $hookmanager;
+
+		if ($this->fullPath === '') {
+			return false;
+		}
+		if (!is_object($hookmanager)) {
+			include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
+			$hookmanager = new HookManager($this->db);
+		}
+		$hookmanager->initHooks(array('document'));
+		$parameters = array('ecmfile' => null, 'modulepart' => $this->modulepart, 'original_file' => $this->relativeFile,
+			'entity' => $this->entity, 'fullpath_original_file' => $this->fullPath, 'filename' => $this->getFileName(),
+			'fullpath_original_file_osencoded' => dol_osencode($this->fullPath), 'docstudio' => 1);
+		$object = new stdClass();
+		$action = '';
+		$reshook = $hookmanager->executeHooks('downloadDocument', $parameters, $object, $action);
+		if ($reshook < 0) {
+			$this->error = $hookmanager->error.(is_array($hookmanager->errors) && count($hookmanager->errors) ? ' '.implode(', ', $hookmanager->errors) : '');
+			dol_syslog(__METHOD__.' refused by the hook downloadDocument: '.$this->error.' user='.$fuser->id, LOG_WARNING);
+			return false;
+		}
+
+		return true;
 	}
 
 	/**

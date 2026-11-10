@@ -116,6 +116,17 @@ abstract class DocStudioFileProvider
 	}
 
 	/**
+	 * Hooks of other modules run before the content is sent (document.php: downloadDocument). None by default.
+	 *
+	 * @param User $fuser User reading the file
+	 * @return bool       False if refused (error in $this->error)
+	 */
+	public function runDownloadHooks(User $fuser)
+	{
+		return true;
+	}
+
+	/**
 	 * URL to download the file with the usual mechanism of its owner (document.php...), or '' when there is none
 	 *
 	 * @return string

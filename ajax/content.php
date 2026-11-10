@@ -95,6 +95,12 @@ if (!count($registry->getViewersFor($provider->getExtension(), $provider->getSiz
 }
 
 
+// Modules refusing or logging the downloads (hook downloadDocument of document.php)
+if (!$provider->runDownloadHooks($user)) {
+	httponly_accessforbidden(dol_escape_htmltag($provider->error !== '' ? $provider->error : $langs->trans('DocStudioErrorForbidden')), 403, 1);
+}
+
+
 /*
  * View
  */
