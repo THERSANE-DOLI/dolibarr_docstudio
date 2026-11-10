@@ -1248,3 +1248,198 @@ body {
 	margin-left: auto;
 	font-variant-numeric: tabular-nums;
 }
+
+/* Layers of the image editor: panel on the right, top layer first */
+
+.ds-layers {
+	flex: 0 0 240px;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	background: var(--ds-surface);
+	border-left: 1px solid var(--ds-border);
+}
+
+.ds-layers-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--ds-border);
+}
+
+.ds-layers-head h2 {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+}
+
+.ds-layers-count {
+	color: var(--ds-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.ds-layers-list {
+	list-style: none;
+	margin: 0;
+	padding: 4px;
+	overflow-y: auto;
+}
+
+.ds-layer {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-height: 36px;
+	padding: 2px 4px 2px 2px;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.ds-layer:hover,
+.ds-layer:focus-visible {
+	background: var(--ds-bg);
+	outline: none;
+}
+
+.ds-layer:focus-visible {
+	border-color: var(--ds-accent);
+}
+
+.ds-layer.docstudio-active {
+	border-color: var(--ds-accent);
+	box-shadow: inset 0 0 0 1px var(--ds-accent);
+}
+
+.ds-layer-hidden .ds-layer-name,
+.ds-layer-hidden .ds-layer-kind,
+.ds-layer-hidden .ds-layer-swatch {
+	opacity: 0.45;
+}
+
+.ds-layer-dragging {
+	opacity: 0.5;
+}
+
+.ds-layer.ds-drop-before {
+	box-shadow: inset 0 2px 0 var(--ds-accent);
+}
+
+.ds-layer.ds-drop-after {
+	box-shadow: inset 0 -2px 0 var(--ds-accent);
+}
+
+.ds-layer-grip {
+	display: inline-flex;
+	color: var(--ds-muted);
+	cursor: grab;
+}
+
+.ds-layer-grip .ds-icon,
+.ds-layer-kind,
+.ds-layer-fixed,
+.ds-layer-action .ds-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.ds-layer-swatch {
+	flex: 0 0 auto;
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	border: 1px solid var(--ds-border);
+}
+
+.ds-layer-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.ds-layer-rename {
+	flex: 1 1 auto;
+	min-width: 0;
+	font: inherit;
+	color: var(--ds-text);
+	background: var(--ds-bg);
+	border: 1px solid var(--ds-accent);
+	border-radius: 3px;
+	padding: 2px 4px;
+}
+
+.ds-layer-action {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	color: var(--ds-muted);
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	cursor: pointer;
+}
+
+.ds-layer-action:hover,
+.ds-layer-action:focus-visible {
+	color: var(--ds-text);
+	border-color: var(--ds-border);
+	outline: none;
+}
+
+.ds-layer-action[aria-pressed="true"] {
+	color: var(--ds-accent);
+	background: color-mix(in srgb, var(--ds-accent) 14%, transparent);
+	border-color: color-mix(in srgb, var(--ds-accent) 40%, transparent);
+}
+
+.ds-layer-photo {
+	cursor: default;
+	padding-left: 24px;
+	color: var(--ds-muted);
+	border-top: 1px dashed var(--ds-border);
+	border-radius: 0;
+	margin-top: 4px;
+}
+
+.ds-layer-photo:hover {
+	background: transparent;
+}
+
+.ds-layer-fixed {
+	margin-right: 6px;
+}
+
+.ds-layers-empty,
+.ds-layers-help {
+	margin: 8px 12px;
+	color: var(--ds-muted);
+	font-size: 13px;
+}
+
+.ds-layers-toggle[aria-pressed="true"] {
+	border-color: var(--ds-accent);
+	color: var(--ds-accent);
+	background: color-mix(in srgb, var(--ds-accent) 12%, var(--ds-surface));
+}
+
+.ds-layers-toggle {
+	gap: 4px;
+}
+
+.ds-layers-toggle .ds-icon {
+	width: 16px;
+	height: 16px;
+}
+
+@media (max-width: 700px) {
+	.ds-layers {
+		flex-basis: 180px;
+	}
+}

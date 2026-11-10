@@ -203,7 +203,7 @@ window.DocStudio.registerViewer('imageedit', {
 		const history = [];
 		let historyIndex = -1;
 		let restoring = false;
-		const PROPS = ['dsKind', 'dsNumber', 'dsFont'];
+		const PROPS = ['dsKind', 'dsNumber', 'dsFont', 'dsName', 'dsLocked'];
 
 		function snapshot() {
 			return {
@@ -242,6 +242,7 @@ window.DocStudio.registerViewer('imageedit', {
 				setDirty();
 			}
 			syncHistoryButtons();
+			refreshLayers();
 		}
 
 		async function restore(index) {
@@ -271,6 +272,7 @@ window.DocStudio.registerViewer('imageedit', {
 			}
 			syncHistoryButtons();
 			enterTool();
+			refreshLayers();
 		}
 
 		function undo() {
@@ -1938,6 +1940,320 @@ window.DocStudio.registerViewer('imageedit', {
 			g.restore();
 		});
 
+		/* Layers: the elements over the photo, top first; hide, lock, rename, order */
+
+		/** Selectable and clickable as the tool and the lock of each element allow */
+		function applyObjectFlags() {
+			const selecting = tool === 'select';
+			userObjects().forEach(function (o) {
+				o.selectable = !o.dsLocked && o.visible !== false && (selecting || (tool === 'text' && o.dsKind === 'text'));
+				o.evented = o.selectable;
+			});
+		}
+
+		const KIND_ICONS = { arrow: 'arrow', line: 'line', rect: 'rect', ellipse: 'ellipse', pen: 'draw', marker: 'highlight', number: 'number', text: 'text' };
+		const KIND_LABELS = {
+			arrow: t('DocStudioToolArrow'), line: t('DocStudioToolLine'), rect: t('DocStudioToolRect'), ellipse: t('DocStudioToolEllipse'),
+			pen: t('DocStudioToolDraw'), marker: t('DocStudioToolHighlight')
+		};
+
+		/** Name shown: the one given by the user, else the kind with its number among the elements of this kind */
+		function layerName(o, rank) {
+			if (o.dsName) {
+				return o.dsName;
+			}
+			if (o.dsKind === 'text') {
+				const text = (o.text || '').replace(/\s+/g, ' ').trim();
+				return t('DocStudioLayerText', text.length > 24 ? text.slice(0, 23) + '…' : text);
+			}
+			if (o.dsKind === 'number') {
+				return t('DocStudioLayerNumber', o.dsNumber);
+			}
+			return (KIND_LABELS[o.dsKind] || o.dsKind) + ' ' + rank;
+		}
+
+		const layersPanel = document.createElement('aside');
+		layersPanel.className = 'ds-layers';
+		layersPanel.setAttribute('aria-label', t('DocStudioLayers'));
+		const layersHead = document.createElement('div');
+		layersHead.className = 'ds-layers-head';
+		const layersTitle = document.createElement('h2');
+		layersTitle.textContent = t('DocStudioLayers');
+		const layersCount = document.createElement('span');
+		layersCount.className = 'ds-layers-count';
+		layersHead.append(layersTitle, layersCount);
+		const layersList = document.createElement('ul');
+		layersList.className = 'ds-layers-list';
+		const layersEmpty = document.createElement('p');
+		layersEmpty.className = 'ds-layers-empty';
+		layersEmpty.textContent = t('DocStudioLayersEmpty');
+		const layersHelp = document.createElement('p');
+		layersHelp.className = 'ds-layers-help';
+		layersHelp.textContent = t('DocStudioLayersHelp');
+		layersPanel.append(layersHead, layersList, layersEmpty, layersHelp);
+		root.appendChild(layersPanel);
+
+		// Shown or not, remembered by this browser
+		const layersToggle = ctx.utils.button('', t('DocStudioLayers'), function () {
+			setLayersShown(layersPanel.hidden);
+		});
+		layersToggle.classList.add('ds-layers-toggle');
+		const layersToggleLabel = document.createElement('span');
+		layersToggle.replaceChildren(icon('layers'), layersToggleLabel);
+		(ctx.statusbar || ctx.toolbar).appendChild(layersToggle);
+
+		function setLayersShown(shown) {
+			layersPanel.hidden = !shown;
+			layersToggle.setAttribute('aria-pressed', shown ? 'true' : 'false');
+			layersToggle.title = shown ? t('DocStudioLayersHide') : t('DocStudioLayersShow');
+			try {
+				window.localStorage.setItem('docstudio.imageLayers', shown ? '1' : '0');
+			} catch (e) {
+				// Storage not available: shown by default at each opening
+			}
+		}
+		(function () {
+			let shown = true;
+			try {
+				shown = window.localStorage.getItem('docstudio.imageLayers') !== '0';
+			} catch (e) {
+				shown = true;
+			}
+			setLayersShown(shown);
+		})();
+
+		let layerDrag = null;
+
+		/** Elements put in this order (top first), the photo stays under them */
+		function reorderLayers(topFirst) {
+			const bottomFirst = topFirst.slice().reverse();
+			bottomFirst.forEach(function (o, i) {
+				canvas.moveObjectTo(o, i + 1);
+			});
+			canvas.requestRenderAll();
+			commit();
+		}
+
+		function layerButton(name, label, pressed, onClick) {
+			const b = document.createElement('button');
+			b.type = 'button';
+			b.className = 'ds-layer-action';
+			b.title = label;
+			b.setAttribute('aria-label', label);
+			b.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+			b.appendChild(icon(name));
+			b.addEventListener('click', function (e) {
+				e.stopPropagation();
+				onClick();
+			});
+			return b;
+		}
+
+		function startRename(o, nameEl, rank) {
+			const input = document.createElement('input');
+			input.type = 'text';
+			input.className = 'ds-layer-rename';
+			input.value = o.dsName || layerName(o, rank);
+			input.maxLength = 60;
+			input.setAttribute('aria-label', t('DocStudioLayerRename'));
+			let done = false;
+			const finish = function (keep) {
+				if (done) {
+					return;
+				}
+				done = true;
+				const value = input.value.trim();
+				if (keep && value !== (o.dsName || '')) {
+					o.dsName = value;
+					commit();
+				} else {
+					refreshLayers();
+				}
+			};
+			input.addEventListener('keydown', function (e) {
+				e.stopPropagation();
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					finish(true);
+				} else if (e.key === 'Escape') {
+					e.preventDefault();
+					finish(false);
+				}
+			});
+			input.addEventListener('blur', function () {
+				finish(true);
+			});
+			nameEl.replaceWith(input);
+			input.focus();
+			input.select();
+		}
+
+		function refreshLayers() {
+			const objects = userObjects().slice().reverse();
+			const ranks = {};
+			const rankOf = new Map();
+			objects.slice().reverse().forEach(function (o) {
+				ranks[o.dsKind] = (ranks[o.dsKind] || 0) + 1;
+				rankOf.set(o, ranks[o.dsKind]);
+			});
+			const focusedIndex = Array.prototype.indexOf.call(layersList.children, document.activeElement && document.activeElement.closest ? document.activeElement.closest('.ds-layer') : null);
+			layersList.replaceChildren();
+			const active = canvas.getActiveObjects();
+			objects.forEach(function (o, index) {
+				const li = document.createElement('li');
+				li.className = 'ds-layer' + (active.includes(o) ? ' docstudio-active' : '') + (o.visible === false ? ' ds-layer-hidden' : '');
+				li.tabIndex = 0;
+				li.draggable = true;
+				li.dsObject = o;
+				const grip = document.createElement('span');
+				grip.className = 'ds-layer-grip';
+				grip.appendChild(icon('grip'));
+				const kind = icon(KIND_ICONS[o.dsKind] || 'select');
+				kind.classList.add('ds-layer-kind');
+				const swatch = document.createElement('span');
+				swatch.className = 'ds-layer-swatch';
+				const c = o.dsKind === 'text' ? o.fill : (o.dsKind === 'number' ? o.getObjects()[0].fill : o.stroke);
+				swatch.style.background = typeof c === 'string' ? c : 'transparent';
+				const name = document.createElement('span');
+				name.className = 'ds-layer-name';
+				name.textContent = layerName(o, rankOf.get(o));
+				name.title = t('DocStudioLayerRename');
+				const eye = layerButton(o.visible === false ? 'eye-off' : 'eye', o.visible === false ? t('DocStudioLayerShow') : t('DocStudioLayerHide'), o.visible === false, function () {
+					o.visible = o.visible === false;
+					if (!o.visible && canvas.getActiveObjects().includes(o)) {
+						canvas.discardActiveObject();
+					}
+					applyObjectFlags();
+					canvas.requestRenderAll();
+					commit();
+				});
+				const lock = layerButton(o.dsLocked ? 'lock' : 'lock-open', o.dsLocked ? t('DocStudioLayerUnlock') : t('DocStudioLayerLock'), !!o.dsLocked, function () {
+					o.dsLocked = !o.dsLocked;
+					if (o.dsLocked && canvas.getActiveObjects().includes(o)) {
+						canvas.discardActiveObject();
+					}
+					applyObjectFlags();
+					canvas.requestRenderAll();
+					commit();
+				});
+				li.append(grip, kind, swatch, name, eye, lock);
+				li.addEventListener('click', function () {
+					if (o.dsLocked || o.visible === false) {
+						return;
+					}
+					if (tool !== 'select') {
+						selectTool('select');
+					}
+					canvas.setActiveObject(o);
+					canvas.requestRenderAll();
+					readSelection();
+					showParams();
+					syncLayerSelection();
+				});
+				name.addEventListener('dblclick', function (e) {
+					e.stopPropagation();
+					startRename(o, name, rankOf.get(o));
+				});
+				li.addEventListener('keydown', function (e) {
+					if (e.target !== li) {
+						return;
+					}
+					// Order with the keyboard too: Alt + up or down
+					if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+						e.preventDefault();
+						e.stopPropagation();
+						const to = index + (e.key === 'ArrowUp' ? -1 : 1);
+						if (to >= 0 && to < objects.length) {
+							const order = objects.slice();
+							order.splice(index, 1);
+							order.splice(to, 0, o);
+							reorderLayers(order);
+							const row = layersList.children[to];
+							if (row) {
+								row.focus();
+							}
+						}
+					} else if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						e.stopPropagation();
+						li.click();
+					} else if (e.key === 'F2') {
+						e.preventDefault();
+						e.stopPropagation();
+						startRename(o, name, rankOf.get(o));
+					}
+				});
+				li.addEventListener('dragstart', function (e) {
+					layerDrag = o;
+					li.classList.add('ds-layer-dragging');
+					e.dataTransfer.effectAllowed = 'move';
+					e.dataTransfer.setData('text/plain', '');
+				});
+				li.addEventListener('dragend', function () {
+					layerDrag = null;
+					refreshLayers();
+				});
+				li.addEventListener('dragover', function (e) {
+					if (!layerDrag || layerDrag === o) {
+						return;
+					}
+					e.preventDefault();
+					const box = li.getBoundingClientRect();
+					const after = e.clientY > box.top + box.height / 2;
+					layersList.querySelectorAll('.ds-drop-before, .ds-drop-after').forEach(function (x) {
+						x.classList.remove('ds-drop-before', 'ds-drop-after');
+					});
+					li.classList.add(after ? 'ds-drop-after' : 'ds-drop-before');
+				});
+				li.addEventListener('drop', function (e) {
+					if (!layerDrag || layerDrag === o) {
+						return;
+					}
+					e.preventDefault();
+					const box = li.getBoundingClientRect();
+					const after = e.clientY > box.top + box.height / 2;
+					const order = objects.filter(function (x) {
+						return x !== layerDrag;
+					});
+					order.splice(order.indexOf(o) + (after ? 1 : 0), 0, layerDrag);
+					layerDrag = null;
+					reorderLayers(order);
+				});
+				layersList.appendChild(li);
+			});
+			// The photo, always under the elements
+			const photoRow = document.createElement('li');
+			photoRow.className = 'ds-layer ds-layer-photo';
+			const photoIcon = icon('photo');
+			photoIcon.classList.add('ds-layer-kind');
+			const photoName = document.createElement('span');
+			photoName.className = 'ds-layer-name';
+			photoName.textContent = t('DocStudioLayerPhoto');
+			const photoLock = icon('lock');
+			photoLock.classList.add('ds-layer-fixed');
+			photoLock.setAttribute('aria-hidden', 'false');
+			photoLock.setAttribute('role', 'img');
+			photoLock.setAttribute('aria-label', t('DocStudioLayerPhotoFixed'));
+			photoRow.title = t('DocStudioLayerPhotoFixed');
+			photoRow.append(photoIcon, photoName, photoLock);
+			layersList.appendChild(photoRow);
+			layersEmpty.hidden = objects.length > 0;
+			layersHelp.hidden = objects.length < 2;
+			layersCount.textContent = String(objects.length);
+			layersToggleLabel.textContent = t('DocStudioLayers') + (objects.length ? ' (' + objects.length + ')' : '');
+			if (focusedIndex >= 0 && layersList.children[focusedIndex]) {
+				layersList.children[focusedIndex].focus();
+			}
+		}
+
+		/** Rows of the selected elements marked, without building the list again */
+		function syncLayerSelection() {
+			const active = canvas.getActiveObjects();
+			Array.prototype.forEach.call(layersList.children, function (li) {
+				li.classList.toggle('docstudio-active', !!li.dsObject && active.includes(li.dsObject));
+			});
+		}
+
 		/* Tool changes */
 
 		/** The tool left: what it showed without applying it is removed */
@@ -1970,10 +2286,7 @@ window.DocStudio.registerViewer('imageedit', {
 		function enterTool() {
 			const selecting = tool === 'select';
 			canvas.skipTargetFind = !(selecting || tool === 'text' || tool === 'crop');
-			userObjects().forEach(function (o) {
-				o.selectable = selecting || (tool === 'text' && o.dsKind === 'text');
-				o.evented = o.selectable;
-			});
+			applyObjectFlags();
 			if (!selecting) {
 				canvas.discardActiveObject();
 			}
@@ -2238,6 +2551,7 @@ window.DocStudio.registerViewer('imageedit', {
 					readSelection();
 					showParams();
 				}
+				syncLayerSelection();
 			});
 		});
 
@@ -2421,6 +2735,9 @@ window.DocStudio.registerViewer('imageedit', {
 		const metadata = document.createElement('p');
 		metadata.textContent = t('DocStudioImageMetadata');
 		impact.appendChild(metadata);
+		const hiddenNote = document.createElement('p');
+		hiddenNote.className = 'ds-warning';
+		impact.appendChild(hiddenNote);
 		const status = document.createElement('p');
 		status.className = 'ds-status';
 		status.setAttribute('role', 'status');
@@ -2464,6 +2781,12 @@ window.DocStudio.registerViewer('imageedit', {
 				applyTool();
 			}
 			status.textContent = '';
+			// Hidden layers are not in the image saved
+			const hiddenCount = userObjects().filter(function (o) {
+				return o.visible === false;
+			}).length;
+			hiddenNote.hidden = hiddenCount === 0;
+			hiddenNote.textContent = hiddenCount ? t('DocStudioLayersHiddenNotSaved', hiddenCount) : '';
 			syncDialog();
 			dialog.showModal();
 		}

@@ -249,3 +249,20 @@ DocStudioHintCutErase = Peignez sur ce qu'il faut retirer. [ et ] : taille du pi
 DocStudioHintCutKeep = Peignez sur ce qu'il faut garder : rend les pixels retirés et arrête la baguette.
 DocStudioHintCutPen = Cliquez pour poser des points, faites glisser pour courber, cliquez sur le premier point (ou Entrée) pour fermer. Alt + clic : angle ou arrondi, Échap : abandonne le tracé en cours.
 DocStudioHintCutJpeg = Le JPEG n'a pas de transparence : le fond retiré devient blanc à l'enregistrement.
+
+# Layers (lot 2b)
+DocStudioLayers = Calques
+DocStudioLayersEmpty = Les éléments ajoutés (flèches, textes, numéros...) s'affichent ici, le dernier au-dessus.
+DocStudioLayersHelp = Faites glisser un calque pour changer l'ordre (ou Alt + flèches haut et bas). Double-clic sur un nom pour le renommer.
+DocStudioLayersShow = Afficher les calques
+DocStudioLayersHide = Masquer les calques
+DocStudioLayerText = Texte : %s
+DocStudioLayerNumber = Numéro %s
+DocStudioLayerRename = Double-clic pour renommer (F2)
+DocStudioLayerShow = Afficher ce calque
+DocStudioLayerHide = Masquer ce calque
+DocStudioLayerLock = Verrouiller ce calque (il n'est plus sélectionnable)
+DocStudioLayerUnlock = Déverrouiller ce calque
+DocStudioLayerPhoto = Photo
+DocStudioLayerPhotoFixed = La photo reste toujours sous les éléments
+DocStudioLayersHiddenNotSaved = %s calque(s) masqué(s) ne seront pas dans l'image enregistrée.

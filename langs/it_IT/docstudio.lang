@@ -249,3 +249,20 @@ DocStudioHintCutErase = Dipingi su ciò che va tolto. [ e ]: dimensione del penn
 DocStudioHintCutKeep = Dipingi su ciò che va tenuto: ripristina i pixel tolti e ferma la bacchetta.
 DocStudioHintCutPen = Clicca per mettere punti, trascina per curvare, clicca sul primo punto (o Invio) per chiudere. Alt + clic: angolo o curvo, Esc: abbandona il tracciato in corso.
 DocStudioHintCutJpeg = Il JPEG non ha trasparenza: lo sfondo tolto diventa bianco al salvataggio.
+
+# Layers (lot 2b)
+DocStudioLayers = Livelli
+DocStudioLayersEmpty = Gli elementi aggiunti (frecce, testi, numeri...) appaiono qui, l'ultimo in alto.
+DocStudioLayersHelp = Trascina un livello per cambiare l'ordine (o Alt + frecce su e giù). Doppio clic su un nome per rinominarlo.
+DocStudioLayersShow = Mostra i livelli
+DocStudioLayersHide = Nascondi i livelli
+DocStudioLayerText = Testo: %s
+DocStudioLayerNumber = Numero %s
+DocStudioLayerRename = Doppio clic per rinominare (F2)
+DocStudioLayerShow = Mostra questo livello
+DocStudioLayerHide = Nascondi questo livello
+DocStudioLayerLock = Blocca questo livello (non più selezionabile)
+DocStudioLayerUnlock = Sblocca questo livello
+DocStudioLayerPhoto = Foto
+DocStudioLayerPhotoFixed = La foto resta sempre sotto gli elementi
+DocStudioLayersHiddenNotSaved = %s livello/i nascosto/i non saranno nell'immagine salvata.

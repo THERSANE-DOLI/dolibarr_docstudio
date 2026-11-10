@@ -249,3 +249,20 @@ DocStudioHintCutErase = Paint over what must be removed. [ and ]: size of the br
 DocStudioHintCutKeep = Paint over what must be kept: brings back the removed pixels and stops the wand.
 DocStudioHintCutPen = Click to put points, drag to curve, click on the first point (or Enter) to close. Alt + click: corner or smooth, Escape: drops the path being drawn.
 DocStudioHintCutJpeg = JPEG has no transparency: the removed background becomes white when saving.
+
+# Layers (lot 2b)
+DocStudioLayers = Layers
+DocStudioLayersEmpty = The elements you add (arrows, texts, numbers...) show here, the last one on top.
+DocStudioLayersHelp = Drag a layer to change the order (or Alt + up and down arrows). Double click on a name to rename it.
+DocStudioLayersShow = Show the layers
+DocStudioLayersHide = Hide the layers
+DocStudioLayerText = Text: %s
+DocStudioLayerNumber = Number %s
+DocStudioLayerRename = Double click to rename (F2)
+DocStudioLayerShow = Show this layer
+DocStudioLayerHide = Hide this layer
+DocStudioLayerLock = Lock this layer (no longer selectable)
+DocStudioLayerUnlock = Unlock this layer
+DocStudioLayerPhoto = Photo
+DocStudioLayerPhotoFixed = The photo always stays under the elements
+DocStudioLayersHiddenNotSaved = %s hidden layer(s) will not be in the image saved.

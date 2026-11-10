@@ -1,5 +1,14 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.12
+
+- NEW: image editor, layers panel :   0.12.0
+  - panel on the right with the elements over the photo, the top one first, the photo always at the bottom
+  - show or hide, lock (no longer selectable), rename (double click or F2), order by drag and drop or with
+    Alt + up and down arrows; click on a layer selects its element
+  - in the history of the editor (undo and redo), hidden layers left out of the image saved, said when saving
+  - panel shown or hidden with the « Layers » button of the status bar, remembered by the browser
+
 ## 0.11
 
 - FIX: editors, the Save button moved down when the options of the tool took several lines :   0.11.2

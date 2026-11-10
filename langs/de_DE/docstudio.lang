@@ -249,3 +249,20 @@ DocStudioHintCutErase = Malen Sie über das, was entfernt werden soll. [ und ]: 
 DocStudioHintCutKeep = Malen Sie über das, was bleiben soll: holt entfernte Pixel zurück und stoppt den Zauberstab.
 DocStudioHintCutPen = Klicken, um Punkte zu setzen, ziehen zum Biegen, Klick auf den ersten Punkt (oder Eingabe) schließt. Alt + Klick: Ecke oder rund, Esc: verwirft den begonnenen Pfad.
 DocStudioHintCutJpeg = JPEG hat keine Transparenz: Der entfernte Hintergrund wird beim Speichern weiß.
+
+# Layers (lot 2b)
+DocStudioLayers = Ebenen
+DocStudioLayersEmpty = Die hinzugefügten Elemente (Pfeile, Texte, Nummern...) erscheinen hier, das letzte oben.
+DocStudioLayersHelp = Ziehen Sie eine Ebene, um die Reihenfolge zu ändern (oder Alt + Pfeil nach oben und unten). Doppelklick auf einen Namen zum Umbenennen.
+DocStudioLayersShow = Ebenen anzeigen
+DocStudioLayersHide = Ebenen ausblenden
+DocStudioLayerText = Text: %s
+DocStudioLayerNumber = Nummer %s
+DocStudioLayerRename = Doppelklick zum Umbenennen (F2)
+DocStudioLayerShow = Diese Ebene anzeigen
+DocStudioLayerHide = Diese Ebene ausblenden
+DocStudioLayerLock = Diese Ebene sperren (nicht mehr auswählbar)
+DocStudioLayerUnlock = Diese Ebene entsperren
+DocStudioLayerPhoto = Foto
+DocStudioLayerPhotoFixed = Das Foto bleibt immer unter den Elementen
+DocStudioLayersHiddenNotSaved = %s ausgeblendete Ebene(n) sind nicht im gespeicherten Bild.

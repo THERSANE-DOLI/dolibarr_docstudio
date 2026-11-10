@@ -239,6 +239,10 @@ if ($provider !== null && count($viewers)) {
 			'DocStudioCutFeather', 'DocStudioCutCorner', 'DocStudioCutSmooth', 'DocStudioCutPointHelp', 'DocStudioCutDeletePoint',
 			'DocStudioCutDeletePath', 'DocStudioCutAuto', 'DocStudioCutReset', 'DocStudioCutWandKept', 'DocStudioHintCutWand',
 			'DocStudioHintCutErase', 'DocStudioHintCutKeep', 'DocStudioHintCutPen', 'DocStudioHintCutJpeg',
+			// Layers
+			'DocStudioLayers', 'DocStudioLayersEmpty', 'DocStudioLayersHelp', 'DocStudioLayersShow', 'DocStudioLayersHide',
+			'DocStudioLayerText', 'DocStudioLayerNumber', 'DocStudioLayerRename', 'DocStudioLayerShow', 'DocStudioLayerHide',
+			'DocStudioLayerLock', 'DocStudioLayerUnlock', 'DocStudioLayerPhoto', 'DocStudioLayerPhotoFixed', 'DocStudioLayersHiddenNotSaved',
 		)),
 	);
 	docstudioPrintJsonData('docstudio-config', $config);

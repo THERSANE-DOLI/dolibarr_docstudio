@@ -249,3 +249,20 @@ DocStudioHintCutErase = Pinte sobre lo que hay que quitar. [ y ]: tamaño del pi
 DocStudioHintCutKeep = Pinte sobre lo que hay que conservar: recupera los píxeles quitados y detiene la varita.
 DocStudioHintCutPen = Haga clic para poner puntos, arrastre para curvar, haga clic en el primer punto (o Intro) para cerrar. Alt + clic: esquina o curvo, Escape: abandona el trazado en curso.
 DocStudioHintCutJpeg = El JPEG no tiene transparencia: el fondo quitado se vuelve blanco al guardar.
+
+# Layers (lot 2b)
+DocStudioLayers = Capas
+DocStudioLayersEmpty = Los elementos añadidos (flechas, textos, números...) aparecen aquí, el último arriba.
+DocStudioLayersHelp = Arrastre una capa para cambiar el orden (o Alt + flechas arriba y abajo). Doble clic en un nombre para renombrarlo.
+DocStudioLayersShow = Mostrar las capas
+DocStudioLayersHide = Ocultar las capas
+DocStudioLayerText = Texto: %s
+DocStudioLayerNumber = Número %s
+DocStudioLayerRename = Doble clic para renombrar (F2)
+DocStudioLayerShow = Mostrar esta capa
+DocStudioLayerHide = Ocultar esta capa
+DocStudioLayerLock = Bloquear esta capa (ya no se puede seleccionar)
+DocStudioLayerUnlock = Desbloquear esta capa
+DocStudioLayerPhoto = Foto
+DocStudioLayerPhotoFixed = La foto siempre queda debajo de los elementos
+DocStudioLayersHiddenNotSaved = %s capa(s) oculta(s) no estarán en la imagen guardada.
