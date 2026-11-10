@@ -1,0 +1,46 @@
+# GitHub release with the module zip, installable from Dolibarr (Setup > Modules > Deploy an external module).
+# Built at each push on main that changes the version in the module descriptor: no release yet for that version
+# means a new tag vX.Y.Z, a release named after it and the asset module_docstudio-X.Y.Z.zip.
+# Can be run by hand (Actions > release > Run workflow) for the version currently on main.
+# Stable links: .../releases/latest (page of the last release),
+# .../releases/download/vX.Y.Z/module_docstudio-X.Y.Z.zip (zip of a given version).
+name: release
+
+on:
+  push:
+    branches: [main]
+    paths: ['core/modules/modDocStudio.class.php']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Source
+        uses: actions/checkout@v4
+
+      - name: Build the zip and publish the release
+        run: |
+          set -euo pipefail
+          v=$(grep -oP "\\\$this->version\s*=\s*'\K[0-9]+(\.[0-9]+)*" core/modules/modDocStudio.class.php)
+          if [ -z "$v" ]; then echo "No version found in the module descriptor"; exit 1; fi
+          if gh release view "v$v" >/dev/null 2>&1; then
+            echo "Release v$v already exists"
+            exit 0
+          fi
+          # Dolibarr wants the dir of the module at the root of the zip and a name module_xxx-x.y.z.zip
+          zip="module_docstudio-$v.zip"
+          git archive --format=zip --prefix=docstudio/ -o "$zip" HEAD
+          # Notes of the release: section "## X.Y" of the ChangeLog
+          awk -v s="## ${v%.*}" '$0==s{f=1;next} /^## /{f=0} f' ChangeLog.md > notes.md
+          [ -s notes.md ] || echo "DocStudio $v" > notes.md
+          gh release create "v$v" "$zip" --title "DocStudio $v" --notes-file notes.md --target "$GITHUB_SHA" --latest
