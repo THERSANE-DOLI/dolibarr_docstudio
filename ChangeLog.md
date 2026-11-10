@@ -1,5 +1,19 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.11
+
+- NEW: image editor, cutout (remove the background), taken over from Creative Banners :   0.11.0
+  - tool « Remove the background » (W) with 4 modes: wand (click on the background, the pixels of its color around
+    are removed, click again to bring them back, own tolerance per point), eraser and restore brushes (size,
+    hardness, [ and ]), pen (Bezier paths keeping or removing their inside, soft edge, corner or smooth points)
+  - option « White background from the borders » with its tolerance, « Start again »
+  - own undo and redo (50 steps) until applied, then one step of the editor; applied when another tool is chosen
+    or when saving, dropped with Cancel or Escape
+  - the photo made keeps its source: opening the tool again goes on with the same cutout (restore brings back the
+    pixels) until the image is cropped, turned, resized or changed otherwise
+  - made for big photos: only the zone of the brush is computed again while painting
+  - JPEG has no transparency: the removed background becomes white, said in the help of the tool
+
 ## 0.10
 
 - FIX: document refused (dataroot) when a directory of the documents is a symbolic link to another disk :   0.10.2

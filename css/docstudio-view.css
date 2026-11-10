@@ -1173,3 +1173,20 @@ body {
 	opacity: 0.4;
 	cursor: default;
 }
+
+/* Cutout: modes of the tool with their icon */
+
+.ds-tools .docstudio-button .ds-icon {
+	width: 16px;
+	height: 16px;
+	flex: 0 0 auto;
+}
+
+.ds-tools .docstudio-button {
+	gap: 4px;
+}
+
+.ds-option .ds-range + .ds-range,
+.docstudio-check .ds-range {
+	margin-left: 4px;
+}

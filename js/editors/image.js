@@ -37,6 +37,7 @@ window.DocStudio.registerViewer('imageedit', {
 	async mount(ctx) {
 		const t = ctx.t;
 		const fabric = await import(ctx.config.fabric);
+		const cutoutLib = await import(ctx.config.cutout);
 		const fonts = ctx.config.fonts || [];
 		const types = ctx.config.imageEditTypes || {};
 		const mime = types[ctx.file.extension];
@@ -114,6 +115,18 @@ window.DocStudio.registerViewer('imageedit', {
 		let base = null;		// FabricImage of the photo, always at 0, 0 without transformation
 		let zoom = 1;
 		let dirty = false;
+
+		// Cutout session while the tool is on, its own steps until it is applied
+		let cut = null;
+		let cutMode = 'wand';
+		let cutHist = [];
+		let cutPos = 0;
+		let cutSettings = '';
+		let cutPainting = null;
+		let cutHover = null;
+		let cutFrame = 0;
+		// Pen: selected path and point, drag in progress
+		const pen = { pi: -1, i: -1, drag: null };
 
 		function setDirty() {
 			if (!dirty) {
@@ -258,12 +271,20 @@ window.DocStudio.registerViewer('imageedit', {
 		}
 
 		function undo() {
+			if (tool === 'cutout' && cut) {
+				cutUndo();
+				return;
+			}
 			if (historyIndex > 0) {
 				restore(historyIndex - 1);
 			}
 		}
 
 		function redo() {
+			if (tool === 'cutout' && cut) {
+				cutRedo();
+				return;
+			}
 			if (historyIndex < history.length - 1) {
 				restore(historyIndex + 1);
 			}
@@ -307,6 +328,9 @@ window.DocStudio.registerViewer('imageedit', {
 		}
 
 		function rotate(delta) {
+			if (tool === 'cutout') {
+				selectTool('select');
+			}
 			if (delta > 0) {
 				transformImage([0, 1, -1, 0, height, 0], height, width, false);
 			} else {
@@ -315,6 +339,9 @@ window.DocStudio.registerViewer('imageedit', {
 		}
 
 		function flip(horizontal) {
+			if (tool === 'cutout') {
+				selectTool('select');
+			}
 			if (horizontal) {
 				transformImage([-1, 0, 0, 1, width, 0], width, height, false);
 			} else {
@@ -347,6 +374,7 @@ window.DocStudio.registerViewer('imageedit', {
 			{ code: 'marker', label: t('DocStudioToolHighlight'), icon: 'highlight', key: 'h', group: 'draw' },
 			{ code: 'number', label: t('DocStudioToolNumber'), icon: 'number', key: 'n' },
 			{ code: 'mask', label: t('DocStudioToolMask'), icon: 'blur', key: 'x' },
+			{ code: 'cutout', label: t('DocStudioToolCutout'), icon: 'cutout', key: 'w' },
 			{ code: 'crop', label: t('DocStudioToolCrop'), icon: 'crop', key: 'c' },
 			{ code: 'resize', label: t('DocStudioToolResize'), icon: 'resize', key: '' },
 			{ code: 'adjust', label: t('DocStudioToolAdjust'), icon: 'adjust', key: '' }
@@ -504,6 +532,12 @@ window.DocStudio.registerViewer('imageedit', {
 		const redoButton = actionButton('redo', t('DocStudioRedo') + ' (Ctrl+Y)', redo);
 
 		function syncHistoryButtons() {
+			if (tool === 'cutout' && cut) {
+				// Steps of the cutout until it is applied
+				undoButton.disabled = cutPos <= 0;
+				redoButton.disabled = cutPos >= cutHist.length;
+				return;
+			}
 			undoButton.disabled = historyIndex <= 0;
 			redoButton.disabled = historyIndex >= history.length - 1;
 		}
@@ -627,12 +661,67 @@ window.DocStudio.registerViewer('imageedit', {
 		const contrast = rangeInput(-100, 100, 0);
 		const contrastLabel = labeled(t('DocStudioContrast'), contrast);
 
+		// Cutout: mode (wand, eraser, restore, pen), options of the mode, white background from the borders
+		const cutModes = [
+			{ code: 'wand', label: t('DocStudioCutWand'), icon: 'wand', key: 'w' },
+			{ code: 'erase', label: t('DocStudioCutErase'), icon: 'eraser', key: 'e' },
+			{ code: 'keep', label: t('DocStudioCutKeep'), icon: 'brush', key: 'r' },
+			{ code: 'pen', label: t('DocStudioCutPen'), icon: 'bezier', key: 'p' }
+		];
+		const cutModeBox = document.createElement('span');
+		cutModeBox.className = 'ds-tools';
+		cutModeBox.setAttribute('role', 'group');
+		cutModeBox.setAttribute('aria-label', t('DocStudioToolCutout'));
+		const cutModeButtons = {};
+		cutModes.forEach(function (m) {
+			const b = ctx.utils.button('', m.label + ' (' + m.key.toUpperCase() + ')', function () {
+				setCutMode(m.code);
+			});
+			b.replaceChildren(icon(m.icon), document.createTextNode(' ' + m.label));
+			cutModeButtons[m.code] = b;
+			cutModeBox.appendChild(b);
+		});
+		const cutWandTol = rangeInput(0, 100, 30);
+		const cutWandTolLabel = labeled(t('DocStudioCutTolerance'), cutWandTol);
+		const cutSize = rangeInput(3, 150, 30);
+		const cutSizeLabel = labeled(t('DocStudioSize'), cutSize);
+		const cutHard = rangeInput(0, 100, 80);
+		const cutHardLabel = labeled(t('DocStudioCutHardness'), cutHard);
+		const cutPenMode = select([['keep', t('DocStudioCutPenKeep')], ['erase', t('DocStudioCutPenErase')]]);
+		const cutPenModeLabel = labeled(t('DocStudioCutPath'), cutPenMode);
+		const cutFeather = rangeInput(0, 6, 1);
+		cutFeather.step = '0.5';
+		const cutFeatherLabel = labeled(t('DocStudioCutFeather'), cutFeather);
+		const cutCorner = ctx.utils.button(t('DocStudioCutCorner'), t('DocStudioCutPointHelp'), function () {
+			setPenPointType('corner');
+		});
+		const cutSmooth = ctx.utils.button(t('DocStudioCutSmooth'), t('DocStudioCutPointHelp'), function () {
+			setPenPointType('smooth');
+		});
+		const cutPointDelete = ctx.utils.button(t('DocStudioCutDeletePoint'), t('DocStudioCutDeletePoint') + ' (Suppr)', function () {
+			deletePenPoint();
+		});
+		const cutPathDelete = ctx.utils.button(t('DocStudioCutDeletePath'), '', function () {
+			deletePenPath();
+		});
+		const cutPointBox = document.createElement('span');
+		cutPointBox.className = 'ds-tools';
+		cutPointBox.append(cutCorner, cutSmooth, cutPointDelete, cutPathDelete);
+		const cutAuto = checkbox(t('DocStudioCutAuto'));
+		const cutAutoTol = rangeInput(0, 100, 30);
+		cutAutoTol.title = t('DocStudioCutTolerance');
+		cutAutoTol.setAttribute('aria-label', t('DocStudioCutTolerance'));
+		cutAuto.label.appendChild(cutAutoTol);
+		const cutReset = ctx.utils.button(t('DocStudioCutReset'), '', function () {
+			resetCut();
+		});
+
 		const applyButton = ctx.utils.button(t('DocStudioApply'), '', function () {
 			applyTool();
 		});
 		applyButton.classList.add('docstudio-primary');
 		const cancelButton = ctx.utils.button(t('DocStudioCancel'), '', function () {
-			selectTool('select');
+			cancelTool();
 		});
 		const deleteButton = ctx.utils.button(t('DocStudioDeleteObject'), t('DocStudioDeleteObject') + ' (Suppr)', function () {
 			deleteSelection();
@@ -659,7 +748,9 @@ window.DocStudio.registerViewer('imageedit', {
 			outline: outline.label, background: background.label, shadow: shadow.label, number: nextNumberLabel,
 			maskMode: maskModeLabel, strength: strengthLabel, maskColor: maskColorLabel, ratio: ratioLabel,
 			width: widthLabel, height: heightLabel, keepRatio: keepRatio.label, brightness: brightnessLabel,
-			contrast: contrastLabel, apply: applyButton, cancel: cancelButton, delete: deleteButton
+			contrast: contrastLabel, cutMode: cutModeBox, cutWandTol: cutWandTolLabel, cutSize: cutSizeLabel,
+			cutHard: cutHardLabel, cutPenMode: cutPenModeLabel, cutFeather: cutFeatherLabel, cutPoint: cutPointBox,
+			cutAuto: cutAuto.label, cutReset: cutReset, apply: applyButton, cancel: cancelButton, delete: deleteButton
 		};
 		ctx.toolbar.append(toolName);
 		Object.keys(optionElements).forEach(function (k) {
@@ -680,7 +771,11 @@ window.DocStudio.registerViewer('imageedit', {
 			mask: t('DocStudioHintMask'),
 			crop: t('DocStudioHintImgCrop'),
 			resize: t('DocStudioHintResize'),
-			adjust: t('DocStudioHintAdjust')
+			adjust: t('DocStudioHintAdjust'),
+			wand: t('DocStudioHintCutWand'),
+			erase: t('DocStudioHintCutErase'),
+			keep: t('DocStudioHintCutKeep'),
+			pen: t('DocStudioHintCutPen')
 		};
 
 		/** Kind of the object selected (select tool), '' when none */
@@ -714,6 +809,16 @@ window.DocStudio.registerViewer('imageedit', {
 				['width', 'height', 'keepRatio', 'apply', 'cancel'].forEach(shown.add, shown);
 			} else if (kind === 'adjust') {
 				['brightness', 'contrast', 'apply', 'cancel'].forEach(shown.add, shown);
+			} else if (kind === 'cutout') {
+				shown.add('cutMode');
+				if (cutMode === 'wand') {
+					shown.add('cutWandTol');
+				} else if (cutMode === 'pen') {
+					['cutPenMode', 'cutFeather', 'cutPoint'].forEach(shown.add, shown);
+				} else {
+					['cutSize', 'cutHard'].forEach(shown.add, shown);
+				}
+				['cutAuto', 'cutReset', 'apply', 'cancel'].forEach(shown.add, shown);
 			}
 			if (tool === 'select' && kind !== '') {
 				shown.add('delete');
@@ -725,6 +830,10 @@ window.DocStudio.registerViewer('imageedit', {
 			let text = tool === 'select' && kind !== '' ? '' : (hints[tool] || '');
 			if (tool === 'mask' && maskMode.value === 'blur') {
 				text = t('DocStudioHintMaskBlur');
+			}
+			if (tool === 'cutout') {
+				text = hints[cutMode] + (mime === 'image/jpeg' ? ' ' + t('DocStudioHintCutJpeg') : '');
+				syncCutUi();
 			}
 			hint.textContent = text;
 		}
@@ -1250,6 +1359,579 @@ window.DocStudio.registerViewer('imageedit', {
 			syncResizeInputs(heightInput);
 		});
 
+		/* Cutout: wand, eraser, restore brush, pen (engine in cutout.js) */
+
+		function startCut() {
+			const prev = photo.dsCut;
+			// A photo made by a cutout goes on from its source, so the restore brush brings back its pixels
+			cut = new cutoutLib.Cutout(prev ? prev.source : photo, prev ? prev.state : null);
+			cutHist = [];
+			cutPos = 0;
+			cutSettings = cut.settings();
+			cutAuto.box.checked = !cut.noCut;
+			cutAutoTol.value = String(cut.tol);
+			cut.render(null);
+			base.setElement(cut.canvas);
+			base.set({ left: 0, top: 0 });
+			syncHistoryButtons();
+		}
+
+		/** The cutout shown becomes the photo (one step of the history of the editor) */
+		function applyCut() {
+			if (!cut || cutPos === 0) {
+				return;
+			}
+			const session = cut;
+			cut = null;
+			cutHist = [];
+			cutPos = 0;
+			if (session.isEmpty()) {
+				if (session.source === photo) {
+					return;
+				}
+				setPhoto(session.source);
+			} else {
+				const result = session.canvas;
+				result.dsCut = { source: session.source, state: session.state() };
+				setPhoto(result);
+			}
+			commit();
+		}
+
+		function renderCutSoon() {
+			window.cancelAnimationFrame(cutFrame);
+			cutFrame = window.requestAnimationFrame(function () {
+				if (cut) {
+					cut.render(null);
+					canvas.requestRenderAll();
+				}
+			});
+		}
+
+		function renderCut() {
+			cut.render(null);
+			canvas.requestRenderAll();
+		}
+
+		/** One step of the cutout: settings before and after, bytes of the brushes changed */
+		function cutCommit(patch) {
+			if (!cut) {
+				return;
+			}
+			const after = cut.settings();
+			if (!patch && after === cutSettings) {
+				return;
+			}
+			cutHist.splice(cutPos);
+			cutHist.push({ before: cutSettings, after: after, patch: patch || null });
+			if (cutHist.length > HISTORY_MAX) {
+				cutHist.shift();
+			}
+			cutPos = cutHist.length;
+			cutSettings = after;
+			setDirty();
+			syncHistoryButtons();
+			syncCutUi();
+		}
+
+		function cutRestore(json, patch, side) {
+			cut.setSettings(json);
+			if (patch) {
+				cut.applyPatch(patch, side);
+			}
+			cutSettings = json;
+			pen.pi = -1;
+			pen.i = -1;
+			cutAuto.box.checked = !cut.noCut;
+			cutAutoTol.value = String(cut.tol);
+			renderCut();
+			syncHistoryButtons();
+			syncCutUi();
+		}
+
+		function cutUndo() {
+			if (cutPos > 0) {
+				const step = cutHist[--cutPos];
+				cutRestore(step.before, step.patch, 'before');
+			}
+		}
+
+		function cutRedo() {
+			if (cutPos < cutHist.length) {
+				const step = cutHist[cutPos++];
+				cutRestore(step.after, step.patch, 'after');
+			}
+		}
+
+		function setCutMode(code) {
+			cutMode = code;
+			if (code !== 'pen') {
+				pen.i = -1;
+			}
+			showParams();
+			canvas.requestRenderAll();
+		}
+
+		function openPath() {
+			return cut ? cut.paths.findIndex(function (x) {
+				return !x.closed;
+			}) : -1;
+		}
+
+		function selPath() {
+			return cut && pen.pi >= 0 ? cut.paths[pen.pi] || null : null;
+		}
+
+		function selPt() {
+			const path = selPath();
+			return path && pen.i >= 0 ? path.pts[pen.i] || null : null;
+		}
+
+		function syncCutUi() {
+			Object.keys(cutModeButtons).forEach(function (code) {
+				cutModeButtons[code].classList.toggle('docstudio-active', code === cutMode);
+				cutModeButtons[code].setAttribute('aria-pressed', code === cutMode ? 'true' : 'false');
+			});
+			const path = selPath();
+			const pt = selPt();
+			if (path) {
+				cutPenMode.value = path.mode;
+				cutFeather.value = String(path.feather);
+			}
+			cutCorner.disabled = !pt;
+			cutSmooth.disabled = !pt;
+			cutCorner.classList.toggle('docstudio-active', !!pt && !cutoutLib.isSmooth(pt));
+			cutSmooth.classList.toggle('docstudio-active', !!pt && cutoutLib.isSmooth(pt));
+			cutPointDelete.disabled = !pt;
+			cutPathDelete.disabled = !path;
+		}
+
+		/* Cutout: settings */
+
+		cutWandTol.addEventListener('input', function () {
+			// The tolerance of the last wand point follows, the next points take it
+			if (cut && cut.seeds.length) {
+				cut.seeds[cut.seeds.length - 1].tol = Number(cutWandTol.value);
+				renderCutSoon();
+			}
+		});
+		cutWandTol.addEventListener('change', function () {
+			cutCommit();
+		});
+		cutAuto.box.addEventListener('change', function () {
+			if (cut) {
+				cut.noCut = !cutAuto.box.checked;
+				renderCut();
+				cutCommit();
+			}
+		});
+		cutAutoTol.addEventListener('input', function () {
+			if (cut) {
+				cut.tol = Number(cutAutoTol.value);
+				renderCutSoon();
+			}
+		});
+		cutAutoTol.addEventListener('change', function () {
+			cutCommit();
+		});
+		cutPenMode.addEventListener('change', function () {
+			const path = selPath();
+			if (path) {
+				path.mode = cutPenMode.value;
+				renderCut();
+				cutCommit();
+			}
+		});
+		cutFeather.addEventListener('input', function () {
+			const path = selPath();
+			if (path) {
+				path.feather = Number(cutFeather.value);
+				renderCutSoon();
+			}
+		});
+		cutFeather.addEventListener('change', function () {
+			cutCommit();
+		});
+
+		function resetCut() {
+			if (!cut) {
+				return;
+			}
+			const patch = cut.clearMask();
+			cut.paths = [];
+			cut.seeds = [];
+			cut.noCut = true;
+			cutAuto.box.checked = false;
+			pen.pi = -1;
+			pen.i = -1;
+			renderCut();
+			cutCommit(patch);
+		}
+
+		/* Cutout: pen */
+
+		function setPenPointType(type) {
+			const path = selPath();
+			if (path && selPt()) {
+				cutoutLib.setPointType(path, pen.i, type);
+				renderCut();
+				cutCommit();
+			}
+		}
+
+		function deletePenPoint() {
+			const path = selPath();
+			if (!path || !selPt()) {
+				return;
+			}
+			path.pts.splice(pen.i, 1);
+			if (path.pts.length < 3) {
+				path.closed = false;
+			}
+			if (!path.pts.length) {
+				cut.paths.splice(pen.pi, 1);
+				pen.pi = -1;
+			}
+			pen.i = -1;
+			renderCut();
+			cutCommit();
+		}
+
+		function deletePenPath(index) {
+			const pi = typeof index === 'number' ? index : pen.pi;
+			if (!cut || pi < 0 || !cut.paths[pi]) {
+				return;
+			}
+			cut.paths.splice(pi, 1);
+			pen.pi = -1;
+			pen.i = -1;
+			renderCut();
+			cutCommit();
+		}
+
+		function closePenPath(pi) {
+			cut.paths[pi].closed = true;
+			pen.pi = pi;
+			pen.i = -1;
+			renderCut();
+			cutCommit();
+		}
+
+		function penDown(p, e) {
+			const tol = 8 / zoom;
+			const handle = cutoutLib.hitHandle(selPt(), p, tol);
+			if (handle) {
+				pen.drag = { type: handle };
+				return;
+			}
+			const a = cutoutLib.hitAnchor(cut.paths, p, tol);
+			const open = openPath();
+			if (a) {
+				if (a.pi === open && a.i === 0 && cut.paths[open].pts.length >= 3) {
+					closePenPath(open);
+					return;
+				}
+				pen.pi = a.pi;
+				pen.i = a.i;
+				if (e.altKey) {
+					setPenPointType(cutoutLib.isSmooth(selPt()) ? 'corner' : 'smooth');
+					return;
+				}
+				const pt = selPt();
+				pen.drag = { type: 'anchor', start: p, x: pt.x, y: pt.y };
+				syncCutUi();
+				canvas.requestRenderAll();
+				return;
+			}
+			const seg = cutoutLib.hitSegment(cut.paths, p, tol);
+			if (seg) {
+				pen.pi = seg.pi;
+				pen.i = cutoutLib.insertPoint(cut.paths, seg);
+				const pt = selPt();
+				pen.drag = { type: 'anchor', start: p, x: pt.x, y: pt.y };
+				syncCutUi();
+				canvas.requestRenderAll();
+				return;
+			}
+			// New point at the end of the path being drawn, else a new path; dragging pulls its handles
+			let pi = open;
+			if (pi < 0) {
+				cut.paths.push({ mode: cutPenMode.value, feather: Number(cutFeather.value), closed: false, pts: [] });
+				pi = cut.paths.length - 1;
+			}
+			cut.paths[pi].pts.push({ x: p.x, y: p.y, ix: 0, iy: 0, ox: 0, oy: 0 });
+			pen.pi = pi;
+			pen.i = cut.paths[pi].pts.length - 1;
+			pen.drag = { type: 'new' };
+			syncCutUi();
+			canvas.requestRenderAll();
+		}
+
+		function penMove(p, e) {
+			const pt = selPt();
+			const d = pen.drag;
+			if (!d || !pt) {
+				return;
+			}
+			if (d.type === 'anchor') {
+				pt.x = d.x + p.x - d.start.x;
+				pt.y = d.y + p.y - d.start.y;
+				return;
+			}
+			// Handles opposed (smooth point), Alt: the other one does not move
+			const out = d.type !== 'in';
+			const hx = p.x - pt.x;
+			const hy = p.y - pt.y;
+			if (out) {
+				pt.ox = hx;
+				pt.oy = hy;
+			} else {
+				pt.ix = hx;
+				pt.iy = hy;
+			}
+			if (!e.altKey) {
+				if (out) {
+					pt.ix = -hx;
+					pt.iy = -hy;
+				} else {
+					pt.ox = -hx;
+					pt.oy = -hy;
+				}
+			}
+		}
+
+		/* Cutout: mouse */
+
+		function wandClick(p) {
+			const x = Math.floor(p.x);
+			const y = Math.floor(p.y);
+			if (x < 0 || y < 0 || x >= cut.w || y >= cut.h) {
+				return;
+			}
+			const region = cut.regionAt(x, y);
+			if (region >= 2) {
+				// Click on an area of a wand point: given back
+				cut.seeds.splice(region - 2, 1);
+			} else if (region === 1) {
+				return;
+			} else if (cutoutLib.maskKeep(cut.mask[y * cut.w + x]) >= 0.5) {
+				hint.textContent = t('DocStudioCutWandKept');
+				return;
+			} else {
+				cut.seeds.push({ x: x, y: y, tol: Number(cutWandTol.value) });
+			}
+			renderCut();
+			cutCommit();
+		}
+
+		function brushRadius() {
+			return Number(cutSize.value) / 2 / zoom;
+		}
+
+		function dab(p) {
+			cut.paint(p.x, p.y, brushRadius(), Number(cutHard.value) / 100, cutMode);
+		}
+
+		function cutDown(p, e) {
+			if (!cut) {
+				return;
+			}
+			// Fabric keeps the focus where it was: an option of the bar would catch the shortcuts
+			if (document.activeElement && ctx.toolbar.contains(document.activeElement)) {
+				document.activeElement.blur();
+			}
+			if (cutMode === 'wand') {
+				wandClick(p);
+			} else if (cutMode === 'pen') {
+				penDown(p, e);
+			} else {
+				cutPainting = { last: p };
+				cut.beginStroke();
+				dab(p);
+				canvas.requestRenderAll();
+			}
+		}
+
+		function cutMove(p, e) {
+			if (!cut) {
+				return;
+			}
+			cutHover = p;
+			if (cutPainting) {
+				// Dabs close enough for a continuous stroke
+				const last = cutPainting.last;
+				const step = Math.max(1, brushRadius() / 3);
+				const len = Math.hypot(p.x - last.x, p.y - last.y);
+				for (let d = step; d <= len; d += step) {
+					dab({ x: last.x + (p.x - last.x) * d / len, y: last.y + (p.y - last.y) * d / len });
+				}
+				cutPainting.last = p;
+			} else if (cutMode === 'pen') {
+				penMove(p, e);
+			}
+			canvas.requestRenderAll();
+		}
+
+		function cutUp() {
+			if (!cut) {
+				return;
+			}
+			if (cutPainting) {
+				cutPainting = null;
+				// The restore brush stops the wand: the areas computed again
+				const patch = cut.endStroke(cutMode === 'keep');
+				canvas.requestRenderAll();
+				if (patch) {
+					cutCommit(patch);
+				}
+			} else if (pen.drag) {
+				pen.drag = null;
+				renderCut();
+				cutCommit();
+			}
+		}
+
+		canvas.on('mouse:out', function () {
+			if (cut && cutHover) {
+				cutHover = null;
+				canvas.requestRenderAll();
+			}
+		});
+
+		/** Keys of the cutout, true when used */
+		function cutKey(e) {
+			const k = e.key.toLowerCase();
+			const mode = cutModes.find(function (m) {
+				return m.key === k;
+			});
+			if (mode) {
+				setCutMode(mode.code);
+				return true;
+			}
+			if (e.key === '[' || e.key === ']') {
+				cutSize.value = String(Math.max(3, Math.min(150, Number(cutSize.value) + (e.key === ']' ? 4 : -4))));
+				canvas.requestRenderAll();
+				return true;
+			}
+			if (cutMode === 'pen') {
+				if ((e.key === 'Delete' || e.key === 'Backspace') && selPt()) {
+					deletePenPoint();
+					return true;
+				}
+				const open = openPath();
+				if (e.key === 'Enter' && open >= 0 && cut.paths[open].pts.length >= 3) {
+					closePenPath(open);
+					return true;
+				}
+			}
+			return false;
+		}
+
+		/* Cutout: paths, wand points and brush drawn over the photo */
+
+		canvas.on('after:render', function (e) {
+			// Drawn on the main layer only: the top layer of Fabric is not cleared at each render
+			if (!cut || tool !== 'cutout' || (e.ctx && e.ctx !== canvas.getContext())) {
+				return;
+			}
+			const g = e.ctx || canvas.contextContainer;
+			const s = zoom * canvas.getRetinaScaling();
+			const k = 1 / zoom;
+			g.save();
+			g.setTransform(s, 0, 0, s, 0, 0);
+			const open = openPath();
+			cut.paths.forEach(function (path, pi) {
+				const col = path.mode === 'erase' ? '#d31d11' : '#2a78d6';
+				g.setLineDash(path.closed ? [] : [5 * k, 4 * k]);
+				// White under the line: visible on any photo
+				g.beginPath();
+				cutoutLib.tracePath(g, path);
+				g.strokeStyle = 'rgba(255,255,255,0.85)';
+				g.lineWidth = 3.5 * k;
+				g.stroke();
+				g.strokeStyle = col;
+				g.lineWidth = 1.5 * k;
+				g.stroke();
+				if (cutMode !== 'pen') {
+					return;
+				}
+				g.setLineDash([]);
+				if (pi === open && cutHover && !pen.drag && path.pts.length) {
+					const last = path.pts[path.pts.length - 1];
+					g.globalAlpha = 0.5;
+					g.beginPath();
+					g.moveTo(last.x, last.y);
+					g.lineTo(cutHover.x, cutHover.y);
+					g.stroke();
+					g.globalAlpha = 1;
+				}
+				path.pts.forEach(function (pt, i) {
+					const sel = pi === pen.pi && i === pen.i;
+					if (sel) {
+						[[pt.ix, pt.iy], [pt.ox, pt.oy]].forEach(function (h) {
+							if (!h[0] && !h[1]) {
+								return;
+							}
+							g.beginPath();
+							g.moveTo(pt.x, pt.y);
+							g.lineTo(pt.x + h[0], pt.y + h[1]);
+							g.stroke();
+							g.beginPath();
+							g.arc(pt.x + h[0], pt.y + h[1], 3.5 * k, 0, Math.PI * 2);
+							g.fillStyle = '#ffffff';
+							g.fill();
+							g.stroke();
+						});
+					}
+					// First point of the path being drawn: bigger, click it to close
+					const r = (i === 0 && !path.closed ? 6 : 4) * k;
+					g.fillStyle = sel ? col : '#ffffff';
+					g.beginPath();
+					if (cutoutLib.isSmooth(pt)) {
+						g.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+					} else {
+						g.rect(pt.x - r, pt.y - r, r * 2, r * 2);
+					}
+					g.fill();
+					g.stroke();
+				});
+			});
+			g.setLineDash([]);
+			if (cutMode === 'wand') {
+				g.lineWidth = 1.5 * k;
+				g.strokeStyle = '#2a78d6';
+				g.fillStyle = '#ffffff';
+				cut.seeds.forEach(function (sd) {
+					g.beginPath();
+					g.arc(sd.x + 0.5, sd.y + 0.5, 4 * k, 0, Math.PI * 2);
+					g.fill();
+					g.stroke();
+				});
+			}
+			if ((cutMode === 'erase' || cutMode === 'keep') && cutHover) {
+				// Size of the brush, and its hard part
+				const rad = brushRadius();
+				g.lineWidth = k;
+				g.strokeStyle = 'rgba(255,255,255,0.9)';
+				g.beginPath();
+				g.arc(cutHover.x, cutHover.y, rad, 0, Math.PI * 2);
+				g.stroke();
+				g.setLineDash([3 * k, 3 * k]);
+				g.strokeStyle = cutMode === 'erase' ? '#d31d11' : '#2a78d6';
+				g.stroke();
+				g.setLineDash([]);
+				const inner = rad * Number(cutHard.value) / 100;
+				if (inner > 2 * k && inner < rad - k) {
+					g.globalAlpha = 0.6;
+					g.beginPath();
+					g.arc(cutHover.x, cutHover.y, inner, 0, Math.PI * 2);
+					g.stroke();
+					g.globalAlpha = 1;
+				}
+			}
+			g.restore();
+		});
+
 		/* Tool changes */
 
 		/** The tool left: what it showed without applying it is removed */
@@ -1258,9 +1940,17 @@ window.DocStudio.registerViewer('imageedit', {
 				canvas.remove(cropRect);
 				cropRect = null;
 			}
-			if (tool === 'adjust' && base && base.getElement() !== photo) {
+			if ((tool === 'adjust' || tool === 'cutout') && base && base.getElement() !== photo) {
 				base.setElement(photo);
 				base.set({ left: 0, top: 0 });
+			}
+			if (cut) {
+				cut = null;
+				pen.pi = -1;
+				pen.i = -1;
+				pen.drag = null;
+				cutPainting = null;
+				syncHistoryButtons();
 			}
 			canvas.isDrawingMode = false;
 			const active = canvas.getActiveObject();
@@ -1295,6 +1985,8 @@ window.DocStudio.registerViewer('imageedit', {
 				contrast.value = '0';
 			} else if (tool === 'number') {
 				nextNumber.value = String(nextFreeNumber());
+			} else if (tool === 'cutout') {
+				startCut();
 			}
 			canvas.defaultCursor = selecting ? 'default' : 'crosshair';
 			canvas.requestRenderAll();
@@ -1307,6 +1999,10 @@ window.DocStudio.registerViewer('imageedit', {
 				return;
 			}
 			saveOptions(tool);
+			if (tool === 'cutout' && code !== 'cutout') {
+				// Another tool chosen: the cutout is applied (Cancel or Escape drops it)
+				applyCut();
+			}
 			leaveTool();
 			tool = code;
 			if (def.group) {
@@ -1346,12 +2042,22 @@ window.DocStudio.registerViewer('imageedit', {
 				if (w !== width || h !== height) {
 					transformImage([w / width, 0, 0, h / height, 0, 0], w, h, true);
 				}
+			} else if (tool === 'cutout') {
+				applyCut();
 			} else if (tool === 'adjust') {
 				if (Number(brightness.value) !== 0 || Number(contrast.value) !== 0) {
 					const c = adjusted(photo);
 					setPhoto(c);
 					commit();
 				}
+			}
+			selectTool('select');
+		}
+
+		/** Cancel button and Escape: what the tool showed is dropped */
+		function cancelTool() {
+			if (tool === 'cutout') {
+				leaveTool();
 			}
 			selectTool('select');
 		}
@@ -1370,6 +2076,10 @@ window.DocStudio.registerViewer('imageedit', {
 		canvas.on('mouse:down', function (opt) {
 			const p = opt.scenePoint;
 			if (!p) {
+				return;
+			}
+			if (tool === 'cutout') {
+				cutDown(p, opt.e);
 				return;
 			}
 			if (tool === 'text') {
@@ -1412,6 +2122,10 @@ window.DocStudio.registerViewer('imageedit', {
 		});
 
 		canvas.on('mouse:move', function (opt) {
+			if (tool === 'cutout' && opt.scenePoint) {
+				cutMove(opt.scenePoint, opt.e);
+				return;
+			}
 			if (!drag || !opt.scenePoint) {
 				return;
 			}
@@ -1451,6 +2165,10 @@ window.DocStudio.registerViewer('imageedit', {
 		});
 
 		canvas.on('mouse:up', function () {
+			if (tool === 'cutout') {
+				cutUp();
+				return;
+			}
 			if (!drag) {
 				return;
 			}
@@ -1537,19 +2255,24 @@ window.DocStudio.registerViewer('imageedit', {
 
 		function onKey(e) {
 			const active = document.activeElement;
-			const typing = active && (active.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(active.tagName));
+			// Check boxes, sliders and colors do not take letters: the shortcuts stay usable
+			const typing = active && (active.isContentEditable || ['SELECT', 'TEXTAREA'].includes(active.tagName)
+				|| (active.tagName === 'INPUT' && !['checkbox', 'radio', 'range', 'color', 'button'].includes(active.type)));
 			const editingText = canvas.getActiveObject() && canvas.getActiveObject().isEditing;
 			if (e.key === 'Escape') {
 				closeFlyout();
 				if (editingText) {
 					canvas.getActiveObject().exitEditing();
+				} else if (tool === 'cutout' && openPath() >= 0) {
+					// Drops the path being drawn only (an open path does not cut)
+					deletePenPath(openPath());
 				} else if (tool !== 'select') {
-					selectTool('select');
+					cancelTool();
 				}
 				return;
 			}
 			if (editingText || typing) {
-				if (e.key === 'Enter' && active && active.tagName === 'INPUT' && ['crop', 'resize', 'adjust'].includes(tool)) {
+				if (e.key === 'Enter' && active && active.tagName === 'INPUT' && ['crop', 'resize', 'adjust', 'cutout'].includes(tool)) {
 					e.preventDefault();
 					applyTool();
 				}
@@ -1572,7 +2295,11 @@ window.DocStudio.registerViewer('imageedit', {
 			if (e.altKey) {
 				return;
 			}
-			if (e.key === 'Enter' && ['crop', 'resize', 'adjust'].includes(tool)) {
+			if (tool === 'cutout' && cutKey(e)) {
+				e.preventDefault();
+				return;
+			}
+			if (e.key === 'Enter' && ['crop', 'resize', 'adjust', 'cutout'].includes(tool)) {
 				e.preventDefault();
 				applyTool();
 				return;
@@ -1726,6 +2453,10 @@ window.DocStudio.registerViewer('imageedit', {
 		});
 
 		function onSaveClick() {
+			if (tool === 'cutout') {
+				// The cutout shown is what the user wants to save
+				applyTool();
+			}
 			status.textContent = '';
 			syncDialog();
 			dialog.showModal();

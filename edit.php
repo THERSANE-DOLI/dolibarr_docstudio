@@ -191,6 +191,7 @@ if ($provider !== null && count($viewers)) {
 		'imageEditTypes' => DocStudio::getEditableImageTypes(),
 		'imageMaxPixels' => DocStudio::MAX_IMAGE_PIXELS,
 		'fabric' => dol_buildpath('/docstudio/vendor/fabric/fabric.min.mjs', 1),
+		'cutout' => docstudioAssetUrl('/docstudio/js/editors/cutout.js'),
 		'pdflib' => dol_buildpath('/docstudio/vendor/pdflib/pdf-lib.esm.min.js', 1),
 		'pdfjs' => array(
 			'viewer' => dol_buildpath('/docstudio/vendor/pdfjs/web/pdf_viewer.js', 1),
@@ -230,6 +231,12 @@ if ($provider !== null && count($viewers)) {
 			'DocStudioZoomFitImage', 'DocStudioHintImgSelect', 'DocStudioHintImgText', 'DocStudioHintShape', 'DocStudioHintNumber',
 			'DocStudioHintMask', 'DocStudioHintMaskBlur', 'DocStudioHintImgCrop', 'DocStudioHintResize', 'DocStudioHintAdjust',
 			'DocStudioImageTooBig', 'DocStudioImageMetadata', 'DocStudioImageCannotEncode',
+			// Cutout
+			'DocStudioToolCutout', 'DocStudioCutWand', 'DocStudioCutErase', 'DocStudioCutKeep', 'DocStudioCutPen',
+			'DocStudioCutTolerance', 'DocStudioCutHardness', 'DocStudioCutPath', 'DocStudioCutPenKeep', 'DocStudioCutPenErase',
+			'DocStudioCutFeather', 'DocStudioCutCorner', 'DocStudioCutSmooth', 'DocStudioCutPointHelp', 'DocStudioCutDeletePoint',
+			'DocStudioCutDeletePath', 'DocStudioCutAuto', 'DocStudioCutReset', 'DocStudioCutWandKept', 'DocStudioHintCutWand',
+			'DocStudioHintCutErase', 'DocStudioHintCutKeep', 'DocStudioHintCutPen', 'DocStudioHintCutJpeg',
 		)),
 	);
 	docstudioPrintJsonData('docstudio-config', $config);
