@@ -22,7 +22,8 @@
  *
  * POST only, with the CSRF token of Dolibarr. Checked again here, whatever the editor did in the browser:
  * - the file may be read and written by the user (provider), and editing is allowed for its type;
- * - the content is of the type of the file (for PDF: real PDF structure) and not too big;
+ * - the content is of the type of the file (for PDF: real PDF structure, for images: decoded and encoded again by
+ *   the server, without metadata) and not too big;
  * - the antivirus (provider) and the hook docstudioBeforeSave of other modules.
  */
 
@@ -127,6 +128,10 @@ if ((int) $upload['size'] <= 0 || (int) $upload['size'] > $maxSize) {
 	docstudioSaveAnswer(array('error' => $langs->trans('DocStudioErrorTooBig')), 400);
 }
 if (!DocStudio::isValidContent($extension, $upload['tmp_name'])) {
+	docstudioSaveAnswer(array('error' => $langs->trans('DocStudioErrorBadContent')), 400);
+}
+// Images: only their pixels are kept (metadata and hidden data removed)
+if (!DocStudio::cleanContent($extension, $upload['tmp_name'])) {
 	docstudioSaveAnswer(array('error' => $langs->trans('DocStudioErrorBadContent')), 400);
 }
 

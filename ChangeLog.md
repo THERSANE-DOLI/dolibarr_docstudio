@@ -1,5 +1,22 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.10
+
+- NEW: image editor for PNG, JPEG and WebP (lot 2b, cutout in a next version) :   0.10.0
+  - same layout as the PDF editor: palette of tools on the left, options of the tool on top, shortcuts, pencil
+    « Edit with DocStudio » on the images of the lists of documents (file associations: Editing)
+  - image: crop (free or fixed ratio, thirds), rotate left or right, flip, resize, brightness and contrast with a
+    live preview; the elements follow the image (texts and numbers stay readable)
+  - mask a zone in the photo itself: pixels, blur (help says a blurred text may stay guessable) or plain color
+  - elements editable until saving: arrow, line, rectangle, ellipse (Shift: straight angles, square, circle),
+    drawing, highlighter, numbers 1, 2, 3..., text with font, size, color, bold, italic, outline, background, shadow
+  - undo and redo (50 steps, Ctrl+Z, Ctrl+Y), delete the selected element, zoom (Ctrl + wheel, fit, 1:1)
+  - photo shown in the orientation of the camera, images up to 50 million pixels
+  - saving as a copy or instead of the original: real type of the content checked against the extension, image
+    decoded and encoded again by the server (no EXIF, GPS position nor data hidden after the image), transparency
+    of PNG and WebP kept, JPEG on white
+  - Fabric.js 7.4.0 embedded (MIT)
+
 ## 0.9
 
 - NEW: PDF editor, cross and filled circle next to the check :   0.9.0

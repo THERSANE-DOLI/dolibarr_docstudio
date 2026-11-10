@@ -50,6 +50,11 @@ class DocStudio
 	/** Max size of a file read by the text viewer, in bytes */
 	const MAX_TEXT_SIZE = 5242880;
 
+	/**
+	 * Biggest image the image editor saves (width x height): 50 million pixels, about 200 MB decoded by the server
+	 */
+	const MAX_IMAGE_PIXELS = 50000000;
+
 	/** @var DoliDB */
 	public $db;
 
@@ -133,6 +138,14 @@ class DocStudio
 			'priority' => 50,
 			'mode' => self::ACTION_EDIT,
 		), 'docstudio');
+		$this->addViewer(array(
+			'code' => 'imageedit',
+			'label' => $langs->trans('DocStudioEditorImage'),
+			'extensions' => array_keys(self::getEditableImageTypes()),
+			'script' => '/docstudio/js/editors/image.js',
+			'priority' => 50,
+			'mode' => self::ACTION_EDIT,
+		), 'docstudio');
 
 		if (!is_object($hookmanager)) {
 			include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
@@ -164,6 +177,32 @@ class DocStudio
 			'avif' => 'image/avif',
 			'svg' => 'image/svg+xml',
 		);
+	}
+
+	/**
+	 * Image types the image editor can save, with their type in the browser. The saved content is decoded and encoded
+	 * again by the server in the same type: no metadata (EXIF, GPS), nothing hidden after the image.
+	 *
+	 * @return array<string,string> Extension => MIME type
+	 */
+	public static function getEditableImageTypes()
+	{
+		$types = array();
+		if (function_exists('imagecreatefromstring')) {
+			$info = function_exists('gd_info') ? gd_info() : array();
+			if (!empty($info['PNG Support'])) {
+				$types['png'] = 'image/png';
+			}
+			if (!empty($info['JPEG Support'])) {
+				$types['jpg'] = 'image/jpeg';
+				$types['jpeg'] = 'image/jpeg';
+			}
+			if (!empty($info['WebP Support'])) {
+				$types['webp'] = 'image/webp';
+			}
+		}
+
+		return $types;
 	}
 
 	/**
@@ -381,8 +420,90 @@ class DocStudio
 			return strncmp($head, '%PDF-', 5) === 0 && strpos($tail, '%%EOF') !== false;
 		}
 
+		$types = self::getEditableImageTypes();
+		if (isset($types[$extension])) {
+			// The real type of the content, read from its first bytes, must be the type of the file
+			$info = @getimagesize($file);
+			return is_array($info) && isset($info['mime']) && $info['mime'] === $types[$extension] && $info[0] > 0 && $info[1] > 0
+				&& (int) $info[0] * (int) $info[1] <= self::MAX_IMAGE_PIXELS;
+		}
+
 		// No other type can be saved yet
 		return false;
+	}
+
+	/**
+	 * Content saved rewritten by the server when its type allows it: an image is decoded then encoded again in the
+	 * same type, so only its pixels are kept (no EXIF, GPS position, comment, nor data hidden after the image)
+	 *
+	 * @param string $extension Lowercase extension
+	 * @param string $file      Full path of the content, rewritten in place
+	 * @return bool             False if the content could not be rewritten (then it must not be saved)
+	 */
+	public static function cleanContent($extension, $file)
+	{
+		$types = self::getEditableImageTypes();
+		if (!isset($types[$extension])) {
+			return true;
+		}
+		// GD needs about 5 bytes per pixel, twice for a JPEG (flattened copy): more memory asked when needed
+		$info = @getimagesize($file);
+		if (!is_array($info)) {
+			return false;
+		}
+		$needed = memory_get_usage() + (int) $info[0] * (int) $info[1] * 10 + (int) filesize($file) + 33554432;
+		$limit = self::memoryLimit();
+		if ($limit > 0 && $limit < $needed && @ini_set('memory_limit', (string) $needed) === false) {
+			dol_syslog(__METHOD__.' not enough memory to rewrite the image ('.$needed.' bytes needed)', LOG_WARNING);
+			return false;
+		}
+		$image = @imagecreatefromstring((string) file_get_contents($file));
+		if ($image === false) {
+			return false;
+		}
+		$work = $file.'.clean';
+		if ($types[$extension] === 'image/png') {
+			imagealphablending($image, false);
+			imagesavealpha($image, true);
+			$ok = imagepng($image, $work, 6);
+		} elseif ($types[$extension] === 'image/webp') {
+			imagealphablending($image, false);
+			imagesavealpha($image, true);
+			$ok = imagewebp($image, $work, getDolGlobalInt('DOCSTUDIO_IMAGE_QUALITY', 92));
+		} else {
+			// No transparency in JPEG: transparent pixels on white, like the editor
+			$flat = imagecreatetruecolor(imagesx($image), imagesy($image));
+			imagefill($flat, 0, 0, imagecolorallocate($flat, 255, 255, 255));
+			imagecopy($flat, $image, 0, 0, 0, 0, imagesx($image), imagesy($image));
+			$ok = imagejpeg($flat, $work, getDolGlobalInt('DOCSTUDIO_IMAGE_QUALITY', 92));
+			imagedestroy($flat);
+		}
+		imagedestroy($image);
+		if (!$ok || !@rename($work, $file)) {
+			@unlink($work);
+			return false;
+		}
+		clearstatcache(true, $file);
+
+		return true;
+	}
+
+	/**
+	 * Memory limit of PHP in bytes, 0 when unlimited
+	 *
+	 * @return int
+	 */
+	protected static function memoryLimit()
+	{
+		$value = trim((string) ini_get('memory_limit'));
+		if ($value === '' || $value === '-1') {
+			return 0;
+		}
+		$number = (int) $value;
+		$unit = strtolower(substr($value, -1));
+		$factors = array('k' => 1024, 'm' => 1048576, 'g' => 1073741824);
+
+		return isset($factors[$unit]) ? $number * $factors[$unit] : $number;
 	}
 
 	/**

@@ -103,6 +103,65 @@ class DocStudioSaveTest extends TestCase
 	}
 
 	/**
+	 * Images: the real type must be the type of the extension, then the content is encoded again by the server:
+	 * metadata (EXIF) and data hidden after the image are gone, transparency of PNG kept
+	 *
+	 * @return void
+	 */
+	public function testImageContent()
+	{
+		$types = DocStudio::getEditableImageTypes();
+		if (!isset($types['png'], $types['jpg'])) {
+			$this->markTestSkipped('GD without PNG or JPEG');
+		}
+		$image = imagecreatetruecolor(40, 30);
+		imagealphablending($image, false);
+		imagesavealpha($image, true);
+		imagefill($image, 0, 0, imagecolorallocatealpha($image, 0, 0, 0, 127));
+		imagefilledrectangle($image, 10, 10, 20, 20, imagecolorallocate($image, 200, 30, 30));
+		ob_start();
+		imagepng($image);
+		$png = (string) ob_get_clean();
+		ob_start();
+		imagejpeg($image, null, 90);
+		$jpeg = (string) ob_get_clean();
+		imagedestroy($image);
+
+		// Type of the content checked, not the name
+		$this->assertTrue(DocStudio::isValidContent('png', $this->tmp($png)));
+		$this->assertFalse(DocStudio::isValidContent('jpg', $this->tmp($png)));
+		$this->assertFalse(DocStudio::isValidContent('png', $this->tmp($jpeg)));
+		$this->assertFalse(DocStudio::isValidContent('gif', $this->tmp($png)));
+		$this->assertFalse(DocStudio::isValidContent('svg', $this->tmp('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>')));
+		$this->assertFalse(DocStudio::isValidContent('png', $this->tmp("<?php echo 1; ?>\n".$png)));
+
+		// JPEG with an EXIF segment (camera name) and a script after its end: both removed
+		$exif = "Exif\0\0TestCamera-GPS";
+		$withExif = substr($jpeg, 0, 2)."\xFF\xE1".pack('n', strlen($exif) + 2).$exif.substr($jpeg, 2)."<?php system('id'); ?>";
+		$file = $this->tmp($withExif);
+		$this->assertTrue(DocStudio::isValidContent('jpg', $file));
+		$this->assertTrue(DocStudio::cleanContent('jpg', $file));
+		$clean = (string) file_get_contents($file);
+		$this->assertStringNotContainsString('TestCamera', $clean);
+		$this->assertStringNotContainsString('<?php', $clean);
+		$this->assertSame(array(40, 30), array_slice((array) getimagesize($file), 0, 2));
+
+		// PNG: still transparent where it was, still red in the middle
+		$file = $this->tmp($png."<script>alert(1)</script>");
+		$this->assertTrue(DocStudio::cleanContent('png', $file));
+		$this->assertStringNotContainsString('<script>', (string) file_get_contents($file));
+		$out = imagecreatefrompng($file);
+		$this->assertSame(127, (imagecolorat($out, 2, 2) >> 24) & 0x7F);
+		$this->assertSame(200, (imagecolorat($out, 15, 15) >> 16) & 0xFF);
+		imagedestroy($out);
+
+		// Not an image: refused
+		$this->assertFalse(DocStudio::cleanContent('png', $this->tmp('not an image')));
+		// Other types untouched
+		$this->assertTrue(DocStudio::cleanContent('pdf', $this->tmp(self::PDF)));
+	}
+
+	/**
 	 * Names of copies: no directory, not hidden, extension of the original forced
 	 *
 	 * @return void

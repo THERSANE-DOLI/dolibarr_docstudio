@@ -1127,3 +1127,49 @@ body {
 .ds-hint {
 	white-space: normal;
 }
+
+/* Image editor (lot 2b) */
+
+.ds-img-scroller {
+	display: flex;
+}
+
+.ds-img-stage {
+	margin: auto;
+	padding: 24px;
+}
+
+.ds-img-canvas {
+	flex: 0 0 auto;
+	box-shadow: var(--ds-shadow);
+	/* Transparent parts of the photo shown on a checkerboard */
+	background-color: #ffffff;
+	background-image: linear-gradient(45deg, #d6d9de 25%, transparent 25%), linear-gradient(-45deg, #d6d9de 25%, transparent 25%),
+		linear-gradient(45deg, transparent 75%, #d6d9de 75%), linear-gradient(-45deg, transparent 75%, #d6d9de 75%);
+	background-size: 16px 16px;
+	background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.ds-range {
+	width: 120px;
+	accent-color: var(--ds-accent);
+}
+
+.ds-zoom {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: auto;
+}
+
+.ds-zoom-label {
+	min-width: 48px;
+	text-align: center;
+	color: var(--ds-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.ds-palette-button:disabled {
+	opacity: 0.4;
+	cursor: default;
+}

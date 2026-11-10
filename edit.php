@@ -188,6 +188,9 @@ if ($provider !== null && count($viewers)) {
 		'fonts' => DocStudioFonts::forEditor(),
 		'fontkit' => dol_buildpath('/docstudio/vendor/fontkit/fontkit.umd.min.js', 1),
 		'imageMimeTypes' => DocStudio::getImageMimeTypes(),
+		'imageEditTypes' => DocStudio::getEditableImageTypes(),
+		'imageMaxPixels' => DocStudio::MAX_IMAGE_PIXELS,
+		'fabric' => dol_buildpath('/docstudio/vendor/fabric/fabric.min.mjs', 1),
 		'pdflib' => dol_buildpath('/docstudio/vendor/pdflib/pdf-lib.esm.min.js', 1),
 		'pdfjs' => array(
 			'viewer' => dol_buildpath('/docstudio/vendor/pdfjs/web/pdf_viewer.js', 1),
@@ -217,6 +220,16 @@ if ($provider !== null && count($viewers)) {
 			'DocStudioTools', 'DocStudioMoreTools', 'DocStudioChooseImage', 'DocStudioHintSelect', 'DocStudioHintText', 'DocStudioHintDraw',
 			'DocStudioHintHighlight', 'DocStudioHintLine', 'DocStudioPageDeleted', 'DocStudioRotateLeftN',
 			'DocStudioRotateRightN', 'DocStudioDeletePageN', 'DocStudioRestorePageN', 'DocStudioToolCheck', 'DocStudioHintCheck', 'DocStudioToolCross', 'DocStudioToolDot',
+			// Image editor
+			'DocStudioToolArrow', 'DocStudioToolLine', 'DocStudioToolRect', 'DocStudioToolEllipse', 'DocStudioToolNumber',
+			'DocStudioToolMask', 'DocStudioToolResize', 'DocStudioToolAdjust', 'DocStudioRotateImageLeft', 'DocStudioRotateImageRight',
+			'DocStudioFlipH', 'DocStudioFlipV', 'DocStudioUndo', 'DocStudioRedo', 'DocStudioFill', 'DocStudioItalic', 'DocStudioOutline',
+			'DocStudioBackground', 'DocStudioShadow', 'DocStudioNextNumber', 'DocStudioMaskMode', 'DocStudioMaskPixels', 'DocStudioMaskBlur',
+			'DocStudioMaskFlat', 'DocStudioStrength', 'DocStudioRatio', 'DocStudioRatioFree', 'DocStudioRatioOriginal', 'DocStudioWidth',
+			'DocStudioHeight', 'DocStudioKeepRatio', 'DocStudioBrightness', 'DocStudioContrast', 'DocStudioApply', 'DocStudioDeleteObject',
+			'DocStudioZoomFitImage', 'DocStudioHintImgSelect', 'DocStudioHintImgText', 'DocStudioHintShape', 'DocStudioHintNumber',
+			'DocStudioHintMask', 'DocStudioHintMaskBlur', 'DocStudioHintImgCrop', 'DocStudioHintResize', 'DocStudioHintAdjust',
+			'DocStudioImageTooBig', 'DocStudioImageMetadata', 'DocStudioImageCannotEncode',
 		)),
 	);
 	docstudioPrintJsonData('docstudio-config', $config);

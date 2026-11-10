@@ -84,4 +84,5 @@ GPLv3 or (at your option) any later version. See file COPYING for more informati
 - pdf.js 5.4.624 (Mozilla, Apache 2.0), in `vendor/pdfjs`.
 - pdf-lib 1.17.1 (Andrew Dillon, MIT), in `vendor/pdflib`.
 - @pdf-lib/fontkit 1.1.1 (Devon Govett, Andrew Dillon, MIT), in `vendor/fontkit`.
+- Fabric.js 7.4.0 (Fabric.js contributors, MIT), in `vendor/fabric`.
 - Tabler Icons 3.50.0 (Pawel Kuna, MIT), some icons in `img/docstudio-icons.svg`.
