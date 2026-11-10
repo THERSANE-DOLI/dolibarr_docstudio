@@ -124,6 +124,8 @@ docstudioPrintJsContext($nonce);
 print '</head>'."\n";
 print '<body>'."\n";
 
+// Icons of the buttons (inline sprite: no request, allowed by the content security policy)
+print file_get_contents(__DIR__.'/img/docstudio-icons.svg');
 print '<header class="docstudio-toolbar">';
 print '<span class="docstudio-filename" title="'.dol_escape_htmltag($title).'">'.dol_escape_htmltag($title).'</span>';
 print '<span class="docstudio-tools" id="docstudio-tools"></span>';

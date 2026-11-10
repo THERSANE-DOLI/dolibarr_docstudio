@@ -41,7 +41,7 @@ window.DocStudio.registerViewer('image', {
 		ctx.container.appendChild(img);
 
 		ctx.toolbar.append(
-			ctx.utils.button('↔', ctx.t('DocStudioZoomFit'), function () {
+			ctx.utils.iconButton('fit', ctx.t('DocStudioZoomFit'), function () {
 				img.classList.add('docstudio-image-fit');
 			}),
 			ctx.utils.button('1:1', ctx.t('DocStudioZoomActual'), function () {

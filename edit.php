@@ -145,7 +145,7 @@ print '<body>'."\n";
 print file_get_contents(__DIR__.'/img/docstudio-icons.svg');
 
 print '<header class="docstudio-toolbar">';
-print '<a class="docstudio-button docstudio-back" id="docstudio-back" href="'.dol_escape_htmltag($backtopage).'" title="'.dol_escape_htmltag($langs->trans('DocStudioBack')).'">&#8592;</a>';
+print '<a class="docstudio-button docstudio-back" id="docstudio-back" href="'.dol_escape_htmltag($backtopage).'" title="'.dol_escape_htmltag($langs->trans('DocStudioBack')).'" aria-label="'.dol_escape_htmltag($langs->trans('DocStudioBack')).'"><svg class="ds-icon" aria-hidden="true"><use href="#ds-i-back"></use></svg></a>';
 print '<span class="docstudio-filename" title="'.dol_escape_htmltag($title).'">'.dol_escape_htmltag($title).'</span>';
 print '<span class="docstudio-tools" id="docstudio-tools"></span>';
 if (count($viewers) > 1) {

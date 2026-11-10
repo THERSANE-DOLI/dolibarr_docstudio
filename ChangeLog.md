@@ -2,6 +2,9 @@
 
 ## 0.13
 
+- FIX: arrows of the back and zoom buttons hard to read (characters of the text) :   0.13.1
+  - icons of the editors instead (back arrow, minus, plus, fit to the window), in the viewers too
+
 - NEW: PDF editor, compression when saving, and light or dark theme switch in the status bar :   0.13.0
   - compression none, light (images at 200 dpi), medium (150 dpi) or strong (100 dpi): only the images are reduced
     and encoded again, the text stays text, the original is kept when the file is not smaller; also for a PDF saved

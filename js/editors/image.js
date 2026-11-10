@@ -734,13 +734,13 @@ window.DocStudio.registerViewer('imageedit', {
 		const hint = document.createElement('span');
 		hint.className = 'docstudio-pageinfo ds-hint';
 
-		const zoomOut = ctx.utils.button('−', t('DocStudioZoomOut'), function () {
+		const zoomOut = ctx.utils.iconButton('minus', t('DocStudioZoomOut'), function () {
 			setZoom(zoom / 1.25);
 		});
-		const zoomIn = ctx.utils.button('+', t('DocStudioZoomIn'), function () {
+		const zoomIn = ctx.utils.iconButton('plus', t('DocStudioZoomIn'), function () {
 			setZoom(zoom * 1.25);
 		});
-		const zoomFit = ctx.utils.button('↔', t('DocStudioZoomFitImage'), fitZoom);
+		const zoomFit = ctx.utils.iconButton('fit', t('DocStudioZoomFitImage'), fitZoom);
 		const zoomActual = ctx.utils.button('1:1', t('DocStudioZoomActual'), function () {
 			setZoom(1);
 		});

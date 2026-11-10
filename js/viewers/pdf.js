@@ -487,13 +487,13 @@ window.DocStudio.registerViewer('pdf', {
 		});
 		ctx.toolbar.append(
 			thumbsButton,
-			ctx.utils.button('−', ctx.t('DocStudioZoomOut'), function () {
+			ctx.utils.iconButton('minus', ctx.t('DocStudioZoomOut'), function () {
 				step(-1);
 			}),
-			ctx.utils.button('+', ctx.t('DocStudioZoomIn'), function () {
+			ctx.utils.iconButton('plus', ctx.t('DocStudioZoomIn'), function () {
 				step(1);
 			}),
-			ctx.utils.button('↔', ctx.t('DocStudioZoomFit'), function () {
+			ctx.utils.iconButton('fit', ctx.t('DocStudioZoomFit'), function () {
 				zoom = 'fit';
 				layout();
 			}),

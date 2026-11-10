@@ -105,6 +105,26 @@
 	}
 
 	/**
+	 * Button with an icon of the sprite of DocStudio (img/docstudio-icons.svg, printed in the page)
+	 * @param {string} name   Icon, without the prefix ds-i-
+	 * @param {string} title  Tooltip and accessible name
+	 * @param {function} onClick
+	 * @returns {HTMLButtonElement}
+	 */
+	function iconButton(name, title, onClick) {
+		const btn = button('', title, onClick);
+		btn.classList.add('docstudio-icon-button');
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		svg.setAttribute('class', 'ds-icon');
+		svg.setAttribute('aria-hidden', 'true');
+		const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+		use.setAttribute('href', '#ds-i-' + name);
+		svg.appendChild(use);
+		btn.appendChild(svg);
+		return btn;
+	}
+
+	/**
 	 * Text of a file: UTF-8 when valid (byte order mark removed), else Windows-1252
 	 * @param {ArrayBuffer} buffer
 	 * @returns {{text: string, encoding: string}}
@@ -229,7 +249,7 @@
 		saveContent: saveContent,
 		processContent: processContent,
 		t: t,
-		utils: Object.freeze({ button: button, decodeText: decodeText })
+		utils: Object.freeze({ button: button, iconButton: iconButton, decodeText: decodeText })
 	};
 	Object.freeze(api);
 

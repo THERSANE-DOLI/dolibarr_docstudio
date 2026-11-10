@@ -1500,3 +1500,18 @@ html.ds-theme-fading *::after {
 	animation: none;
 	mix-blend-mode: normal;
 }
+
+/* Buttons with an icon (back, zoom): square, icon of the size of the palette ones, readable in both themes */
+
+.docstudio-icon-button,
+.docstudio-back {
+	justify-content: center;
+	min-width: 30px;
+	padding: 4px 6px;
+}
+
+.docstudio-icon-button .ds-icon,
+.docstudio-back .ds-icon {
+	width: 18px;
+	height: 18px;
+}
