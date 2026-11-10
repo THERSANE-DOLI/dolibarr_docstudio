@@ -303,3 +303,18 @@ DocStudioViewerOffice = Office (Word, Excel, PowerPoint)
 DocStudioSlide = Folie %s / %s
 DocStudioSheet = Blatt %s / %s
 DocStudioOfficeError = Dieses Office-Dokument kann hier nicht angezeigt werden (passwortgeschützt, beschädigt oder zu groß). Laden Sie es herunter, um es zu öffnen.
+
+# Office server (WOPI, lot 4)
+DocStudioViewerWopi = Office-Server
+DocStudioEditorWopi = Mit dem Office-Server bearbeiten
+DocStudioWopiUnavailable = Der Office-Server kann diese Datei nicht öffnen oder antwortet nicht. Bitten Sie den Administrator, seine Einrichtung in DocStudio zu prüfen.
+DocStudioWopiSaving = Speichern in Dolibarr...
+DocStudioWopiServer = Office-Server (optional)
+DocStudioWopiServerHelp = Collabora Online, OnlyOffice oder Euro-Office: Office- und OpenDocument-Dateien werden im Browser geöffnet und bearbeitet, von mehreren gleichzeitig, und an ihrem Platz in Dolibarr mit den Rechten jedes Benutzers gespeichert. Der Office-Server muss Dolibarr erreichen (Adresse unten) und der Browser muss ihn erreichen.
+DocStudioWopiUrl = Adresse des Office-Servers
+DocStudioWopiUrlHelp = Die Adresse, die der Browser öffnet, zum Beispiel https://office.example.com. Leer: kein Office-Server.
+DocStudioWopiHostUrl = Adresse von Dolibarr aus Sicht des Office-Servers
+DocStudioWopiHostUrlHelp = Nur wenn der Office-Server Dolibarr über eine andere Adresse erreicht als die Benutzer. Leer: %s
+DocStudioWopiOk = Office-Server erreichbar (%s). Bearbeitung: %s. %s Typen zum Lesen geöffnet.
+DocStudioWopiKo = Office-Server nicht erreichbar oder ohne Beschreibung: %s
+DocStudioWopiBadUrl = Ungültige Adresse: Sie muss mit http:// oder https:// beginnen.

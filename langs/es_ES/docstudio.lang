@@ -303,3 +303,18 @@ DocStudioViewerOffice = Office (Word, Excel, PowerPoint)
 DocStudioSlide = Diapositiva %s / %s
 DocStudioSheet = Hoja %s / %s
 DocStudioOfficeError = Este documento de Office no se puede mostrar aquí (protegido con contraseña, dañado o demasiado grande). Descárguelo para abrirlo.
+
+# Office server (WOPI, lot 4)
+DocStudioViewerWopi = Servidor ofimático
+DocStudioEditorWopi = Editar con el servidor ofimático
+DocStudioWopiUnavailable = El servidor ofimático no puede abrir este archivo, o no responde. Pida al administrador que revise su configuración en DocStudio.
+DocStudioWopiSaving = Guardando en Dolibarr...
+DocStudioWopiServer = Servidor ofimático (opcional)
+DocStudioWopiServerHelp = Collabora Online, OnlyOffice o Euro-Office: los archivos Office y OpenDocument se abren y se editan en el navegador, entre varios a la vez, y se guardan en su sitio en Dolibarr con los permisos de cada usuario. El servidor ofimático debe poder acceder a Dolibarr (dirección abajo) y el navegador debe poder acceder a él.
+DocStudioWopiUrl = Dirección del servidor ofimático
+DocStudioWopiUrlHelp = La que abre el navegador, por ejemplo https://office.example.com. Vacío: sin servidor ofimático.
+DocStudioWopiHostUrl = Dirección de Dolibarr vista por el servidor ofimático
+DocStudioWopiHostUrlHelp = Solo si el servidor ofimático accede a Dolibarr por otra dirección que los usuarios. Vacío: %s
+DocStudioWopiOk = Servidor ofimático accesible (%s). Edición: %s. %s tipos abiertos en lectura.
+DocStudioWopiKo = Servidor ofimático no accesible o sin descripción: %s
+DocStudioWopiBadUrl = Dirección no válida: debe empezar por http:// o https://.

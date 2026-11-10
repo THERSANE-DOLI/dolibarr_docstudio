@@ -271,6 +271,18 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 	}
 
 	/**
+	 * Last change of the file
+	 *
+	 * @return int
+	 */
+	public function getModifiedTime()
+	{
+		clearstatcache(true, $this->fullPath);
+
+		return $this->fullPath === '' ? 0 : (int) filemtime($this->fullPath);
+	}
+
+	/**
 	 * Print the raw content of the file
 	 *
 	 * @return bool

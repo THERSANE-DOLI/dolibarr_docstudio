@@ -195,6 +195,7 @@ if ($provider !== null && count($viewers)) {
 		'compress' => DocStudioPdfTools::canCompress(),
 		'processUrl' => DocStudio::buildUrl('ajax/process.php', $source, $provider->getParams()),
 		'themeUrl' => dol_buildpath('/docstudio/ajax/theme.php', 1),
+		'wopi' => docstudioWopiConfig($registry, $source, $provider, $viewers, 'wopiedit', 'edit'),
 		'fonts' => DocStudioFonts::forEditor(),
 		'fontkit' => dol_buildpath('/docstudio/vendor/fontkit/fontkit.umd.min.js', 1),
 		'imageMimeTypes' => DocStudio::getImageMimeTypes(),
@@ -250,6 +251,8 @@ if ($provider !== null && count($viewers)) {
 			// Compression
 			'DocStudioCompression', 'DocStudioCompressNone', 'DocStudioCompressLight', 'DocStudioCompressMedium', 'DocStudioCompressStrong',
 			'DocStudioCompressHelp', 'DocStudioCompressing', 'DocStudioErrorCompress',
+			// Office server
+			'DocStudioWopiUnavailable', 'DocStudioWopiSaving',
 			// Theme
 			'DocStudioThemeDark', 'DocStudioThemeToLight', 'DocStudioThemeToDark',
 			// Layers

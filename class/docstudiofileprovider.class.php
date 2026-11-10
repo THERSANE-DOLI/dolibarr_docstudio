@@ -137,6 +137,16 @@ abstract class DocStudioFileProvider
 	}
 
 	/**
+	 * Last change of the content (timestamp), 0 when unknown: version of the file for an office server (WOPI)
+	 *
+	 * @return int
+	 */
+	public function getModifiedTime()
+	{
+		return 0;
+	}
+
+	/**
 	 * Values of the request parameters of the loaded file, to build the URLs of DocStudio again
 	 *
 	 * @return array<string,string|int>

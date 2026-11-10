@@ -158,6 +158,26 @@ class DocStudio
 			'mode' => self::ACTION_EDIT,
 		), 'docstudio');
 
+		// Office server (WOPI): first choice for the Office and OpenDocument types when it is set (lot 4)
+		dol_include_once('/docstudio/class/docstudiowopi.class.php');
+		if (DocStudioWopi::isEnabled()) {
+			$this->addViewer(array(
+				'code' => 'wopi',
+				'label' => $langs->trans('DocStudioViewerWopi'),
+				'extensions' => DocStudioWopi::getExtensions('view'),
+				'script' => '/docstudio/js/viewers/wopi.js',
+				'priority' => 60,
+			), 'docstudio');
+			$this->addViewer(array(
+				'code' => 'wopiedit',
+				'label' => $langs->trans('DocStudioEditorWopi'),
+				'extensions' => DocStudioWopi::getExtensions('edit'),
+				'script' => '/docstudio/js/viewers/wopi.js',
+				'priority' => 60,
+				'mode' => self::ACTION_EDIT,
+			), 'docstudio');
+		}
+
 		if (!is_object($hookmanager)) {
 			include_once DOL_DOCUMENT_ROOT.'/core/class/hookmanager.class.php';
 			$hookmanager = new HookManager($this->db);

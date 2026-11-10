@@ -66,17 +66,60 @@ function docstudioAdminPrepareHead()
  * Headers of the viewer page: nothing can be loaded from outside, the page can only be framed by Dolibarr itself.
  * 'wasm-unsafe-eval' lets pdf.js run its own WebAssembly decoders (JPEG 2000, JBIG2), not JavaScript eval.
  *
+ * The office server (WOPI), when set, is the only other origin: framed and receiving the form that opens it.
+ *
  * @param string $nonce Nonce of the inline scripts
  * @return void
  */
 function docstudioSendViewerHeaders($nonce)
 {
+	dol_include_once('/docstudio/class/docstudiowopi.class.php');
+	$office = DocStudioWopi::getServerOrigin();
+	$frame = $office !== '' ? "frame-src ".$office."; form-action ".$office : "form-action 'none'";
 	header('Content-Type: text/html; charset=UTF-8');
 	header('Cache-Control: private, no-store');
 	header('X-Content-Type-Options: nosniff');
 	header('X-Frame-Options: SAMEORIGIN');
 	header('Referrer-Policy: no-referrer');
-	header("Content-Security-Policy: default-src 'none'; script-src 'self' 'nonce-".$nonce."' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'; object-src 'none'");
+	header("Content-Security-Policy: default-src 'none'; script-src 'self' 'nonce-".$nonce."' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' blob: data:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'self'; base-uri 'none'; ".$frame."; object-src 'none'");
+}
+
+/**
+ * Opening of a file in the office server (WOPI) for the page: address of its page and access token, or null when the
+ * office server is not one of the viewers of this file
+ *
+ * @param DocStudio               $registry
+ * @param string                  $source
+ * @param DocStudioFileProvider   $provider
+ * @param array<string,mixed>     $viewers  Viewers offered on the page
+ * @param string                  $code     'wopi' or 'wopiedit'
+ * @param string                  $mode     'view' or 'edit'
+ * @return array<string,mixed>|null
+ */
+function docstudioWopiConfig($registry, $source, $provider, $viewers, $code, $mode)
+{
+	global $conf, $langs, $user;
+
+	if (!isset($viewers[$code])) {
+		return null;
+	}
+	dol_include_once('/docstudio/class/docstudiowopi.class.php');
+	$params = $provider->getParams();
+	$fileId = DocStudioWopi::fileId($source, $params, (int) $conf->entity);
+	$wopi = new DocStudioWopi();
+	$url = $wopi->getActionUrl($provider->getExtension(), $mode, $fileId, (int) $conf->entity, $langs->defaultlang);
+	if ($url === '') {
+		return array('url' => '', 'error' => $wopi->error);
+	}
+	$token = DocStudioWopi::makeToken($user, (int) $conf->entity, $source, $params, $mode);
+
+	return array(
+		'url' => $url,
+		'origin' => DocStudioWopi::getServerOrigin(),
+		'token' => $token['token'],
+		// Milliseconds since 1970 (WOPI)
+		'ttl' => $token['expire'] * 1000,
+	);
 }
 
 /**

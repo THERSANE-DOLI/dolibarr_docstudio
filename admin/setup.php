@@ -58,6 +58,7 @@ require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once '../lib/docstudio.lib.php';
 dol_include_once('/docstudio/class/docstudio.class.php');
 dol_include_once('/docstudio/class/docstudiopdftools.class.php');
+dol_include_once('/docstudio/class/docstudiowopi.class.php');
 
 /**
  * @var Conf $conf
@@ -118,8 +119,38 @@ if ($action == 'updatetools') {
 	exit;
 }
 
+// Office server (WOPI)
+if ($action == 'updatewopi') {
+	$url = trim(GETPOST('DOCSTUDIO_WOPI_URL', 'alphanohtml'));
+	$hostUrl = trim(GETPOST('DOCSTUDIO_WOPI_HOST_URL', 'alphanohtml'));
+	if (($url !== '' && !preg_match('/^https?:\/\/[^\s]+$/i', $url)) || ($hostUrl !== '' && !preg_match('/^https?:\/\/[^\s]+$/i', $hostUrl))) {
+		setEventMessages($langs->trans('DocStudioWopiBadUrl'), null, 'errors');
+	} else {
+		dolibarr_set_const($db, 'DOCSTUDIO_WOPI_URL', $url, 'chaine', 0, '', $conf->entity);
+		dolibarr_set_const($db, 'DOCSTUDIO_WOPI_HOST_URL', $hostUrl, 'chaine', 0, '', $conf->entity);
+		if ($url !== '') {
+			// Types of the office server read now, then kept one hour
+			$wopi = new DocStudioWopi();
+			$wopi->getDiscovery(true);
+		}
+		setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
+	}
+	header('Location: '.$_SERVER['PHP_SELF'].'#docstudio-wopi');
+	exit;
+}
+
 // Test of the tools, from the values saved
 $testResults = array();
+if ($action == 'testwopi' && DocStudioWopi::isEnabled()) {
+	$wopi = new DocStudioWopi();
+	$discovery = $wopi->getDiscovery(true);
+	if (count($discovery)) {
+		$version = $wopi->getServerVersion();
+		$testResults['wopi'] = array(true, $langs->transnoentitiesnoconv('DocStudioWopiOk', $version !== '' ? $version : '?', implode(', ', DocStudioWopi::getExtensions('edit')), count(DocStudioWopi::getExtensions('view'))));
+	} else {
+		$testResults['wopi'] = array(false, $langs->transnoentitiesnoconv('DocStudioWopiKo', $wopi->error));
+	}
+}
 if ($action == 'testtools') {
 	$tools = new DocStudioPdfTools();
 	if (DocStudioPdfTools::hasStirling()) {
@@ -209,9 +240,40 @@ if (DocStudioPdfTools::canCompress()) {
 }
 print '</div>';
 print '</form>';
-foreach ($testResults as $res) {
+foreach ($testResults as $key => $res) {
+	if ($key === 'wopi') {
+		continue;
+	}
 	print '<div class="'.($res[0] ? 'ok' : 'error').' margintoponly">'.img_picto('', $res[0] ? 'tick' : 'error', 'class="pictofixedwidth"').dol_escape_htmltag($res[1]).'</div>';
 }
+// Office server (WOPI)
+print '<br><a id="docstudio-wopi"></a>';
+print load_fiche_titre($langs->trans("DocStudioWopiServer"), '', '');
+print '<p class="opacitymedium">'.$langs->trans('DocStudioWopiServerHelp').'</p>';
+print '<form method="POST" action="'.dol_escape_htmltag($_SERVER['PHP_SELF']).'">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
+print '<input type="hidden" name="action" value="updatewopi">';
+print '<div class="div-table-responsive-no-min">';
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre"><td>'.$langs->trans("Parameter").'</td><td>'.$langs->trans("Value").'</td></tr>';
+print '<tr class="oddeven"><td><label for="DOCSTUDIO_WOPI_URL">'.$langs->trans('DocStudioWopiUrl').'</label><br><span class="opacitymedium small">'.$langs->trans('DocStudioWopiUrlHelp').'</span></td>';
+print '<td><input type="url" class="minwidth300" id="DOCSTUDIO_WOPI_URL" name="DOCSTUDIO_WOPI_URL" value="'.dol_escape_htmltag(getDolGlobalString('DOCSTUDIO_WOPI_URL')).'" placeholder="https://office.example.com" autocomplete="off" spellcheck="false"></td></tr>';
+print '<tr class="oddeven"><td><label for="DOCSTUDIO_WOPI_HOST_URL">'.$langs->trans('DocStudioWopiHostUrl').'</label><br><span class="opacitymedium small">'.$langs->trans('DocStudioWopiHostUrlHelp', dol_escape_htmltag(DocStudioWopi::getHostUrl())).'</span></td>';
+print '<td><input type="url" class="minwidth300" id="DOCSTUDIO_WOPI_HOST_URL" name="DOCSTUDIO_WOPI_HOST_URL" value="'.dol_escape_htmltag(getDolGlobalString('DOCSTUDIO_WOPI_HOST_URL')).'" placeholder="'.dol_escape_htmltag(DOL_MAIN_URL_ROOT).'" autocomplete="off" spellcheck="false"></td></tr>';
+print '</table>';
+print '</div>';
+print '<div class="center"><input type="submit" class="button button-save" value="'.dol_escape_htmltag($langs->trans('Save')).'">';
+if (DocStudioWopi::isEnabled()) {
+	print ' <a class="button button-cancel" href="'.dol_escape_htmltag($_SERVER['PHP_SELF'].'?action=testwopi&token='.newToken().'#docstudio-wopi').'">'.$langs->trans('DocStudioTestTools').'</a>';
+}
+print '</div>';
+print '</form>';
+if (isset($testResults['wopi'])) {
+	$res = $testResults['wopi'];
+	print '<div class="'.($res[0] ? 'ok' : 'error').' margintoponly">'.img_picto('', $res[0] ? 'tick' : 'error', 'class="pictofixedwidth"').dol_escape_htmltag($res[1]).'</div>';
+	unset($testResults['wopi']);
+}
+
 // What redaction really does, written where the tools are chosen (analysis 5.1)
 print '<br>';
 print info_admin($langs->trans('DocStudioRedactionSetupHelp'), 0, 0, 'info');

@@ -1,5 +1,21 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.15
+
+- NEW: office server (WOPI): Office and OpenDocument files opened and edited in Collabora Online (lot 4) :   0.15.0
+  - DocStudio is a WOPI host (wopi.php): file information, reading, saving in place, locks; also usable with
+    OnlyOffice and Euro-Office (same protocol, not tested yet)
+  - reading for the Office types (docx, xlsx, pptx, odt, ods, odp, doc, xls, ppt, rtf...), editing for docx, xlsx,
+    pptx, odt, ods, odp with the pencil of the lists of documents; several users can edit together
+  - first choice when it is set, the Office viewer of DocStudio stays available; PDF, images and text keep the viewers
+    of DocStudio
+  - access token signed, for one user, one file and one mode, 10 hours; the file is loaded again with the rights of the
+    user at each call; saving checked again (write permission, package of the type of the file, size, antivirus, hook
+    docstudioBeforeSave); a token for reading cannot write nor lock; the token is posted to the frame, never in its
+    address
+  - back button: the office server saves first; conflict when the file changed elsewhere meanwhile (Collabora asks)
+  - setup « Office server »: address, address of Dolibarr seen by the office server, Test button (version, types)
+
 ## 0.14
 
 - NEW: Office viewer for Word (docx), Excel (xlsx) and PowerPoint (pptx) files, in the browser (lot 3) :   0.14.0

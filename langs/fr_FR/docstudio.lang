@@ -303,3 +303,18 @@ DocStudioViewerOffice = Office (Word, Excel, PowerPoint)
 DocStudioSlide = Diapositive %s / %s
 DocStudioSheet = Feuille %s / %s
 DocStudioOfficeError = Ce document Office ne peut pas être affiché ici (protégé par un mot de passe, abîmé ou trop gros). Téléchargez-le pour l'ouvrir.
+
+# Office server (WOPI, lot 4)
+DocStudioViewerWopi = Serveur bureautique
+DocStudioEditorWopi = Modifier avec le serveur bureautique
+DocStudioWopiUnavailable = Le serveur bureautique ne sait pas ouvrir ce fichier, ou il ne répond pas. Demandez à l'administrateur de vérifier sa configuration dans DocStudio.
+DocStudioWopiSaving = Enregistrement dans Dolibarr...
+DocStudioWopiServer = Serveur bureautique (optionnel)
+DocStudioWopiServerHelp = Collabora Online, OnlyOffice ou Euro-Office : les fichiers Office et OpenDocument s'ouvrent et se modifient dans le navigateur, à plusieurs en même temps, et sont enregistrés à leur place dans Dolibarr avec les droits de chaque utilisateur. Le serveur bureautique doit pouvoir joindre Dolibarr (adresse ci-dessous) et le navigateur doit pouvoir le joindre.
+DocStudioWopiUrl = Adresse du serveur bureautique
+DocStudioWopiUrlHelp = Celle que le navigateur ouvre, par exemple https://office.example.com. Vide : pas de serveur bureautique.
+DocStudioWopiHostUrl = Adresse de Dolibarr vue par le serveur bureautique
+DocStudioWopiHostUrlHelp = Seulement si le serveur bureautique joint Dolibarr par une autre adresse que les utilisateurs. Vide : %s
+DocStudioWopiOk = Serveur bureautique joignable (%s). Modification : %s. %s types ouverts en lecture.
+DocStudioWopiKo = Serveur bureautique injoignable ou sans description : %s
+DocStudioWopiBadUrl = Adresse invalide : elle doit commencer par http:// ou https://.
