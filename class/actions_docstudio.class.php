@@ -55,6 +55,51 @@ class ActionsDocStudio extends CommonHookActions
 	}
 
 	/**
+	 * Viewers of DocStudio for the attachments of a mail of inbox (« Open with… » of inbox, lot 5). Inbox shows the
+	 * page in its own window; it adds « force=1 » when the user opens an attachment not scanned by the antivirus.
+	 *
+	 * @param array{mail:int,attachments:array<int,array{part:int,name:string,extension:string,size:int}>} $parameters
+	 * @param mixed       $object      Not used
+	 * @param string      $action      Not used
+	 * @param HookManager $hookmanager Hook manager
+	 * @return int                     0
+	 */
+	public function inboxAttachmentViewers($parameters, &$object, &$action, $hookmanager)
+	{
+		global $langs, $user;
+
+		dol_include_once('/docstudio/class/docstudio.class.php');
+		if (!isModEnabled('docstudio') || empty($parameters['attachments']) || !is_array($parameters['attachments'])) {
+			return 0;
+		}
+		$registry = new DocStudio($this->db);
+		if ($registry->getProvider('inbox') === null) {
+			return 0;
+		}
+		$langs->load('docstudio@docstudio');
+		$out = array();
+		foreach ($parameters['attachments'] as $part => $a) {
+			$extension = isset($a['extension']) ? (string) $a['extension'] : '';
+			$viewers = $registry->getViewersFor($extension, isset($a['size']) ? (int) $a['size'] : 0);
+			// The viewers the administrator allows for this type, like the lists of documents (all when none)
+			$allowed = array_intersect_key($viewers, array_flip($registry->getUserChoices($extension)));
+			if (count($allowed)) {
+				$viewers = $allowed;
+			}
+			foreach ($viewers as $code => $viewer) {
+				$out[(int) $part][] = array(
+					'code' => $code,
+					'label' => $viewer['label'],
+					'url' => DocStudio::buildUrl('view.php', 'inbox', array('mail' => (int) $parameters['mail'], 'part' => (int) $part, 'force' => 0)).'&viewer='.rawurlencode($code).'&embed=1',
+				);
+			}
+		}
+		$this->results['inboxAttachmentViewers'] = $out;
+
+		return 0;
+	}
+
+	/**
 	 * Add the « Open with DocStudio » links to the lists of documents of the page
 	 *
 	 * @param array<string,mixed> $parameters Hook metadatas (context, etc...)

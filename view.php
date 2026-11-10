@@ -138,7 +138,7 @@ if (count($viewers) > 1) {
 }
 if ($embed && $provider !== null) {
 	$selfUrl = DocStudio::buildUrl('view.php', $source, $provider->getParams());
-	print '<a class="docstudio-button" href="'.dol_escape_htmltag($selfUrl).'" target="_blank" rel="noopener" title="'.dol_escape_htmltag($langs->trans('DocStudioOpenInNewTab')).'">&#8599;</a>';
+	print '<a class="docstudio-button docstudio-icon-button" href="'.dol_escape_htmltag($selfUrl).'" target="_blank" rel="noopener" title="'.dol_escape_htmltag($langs->trans('DocStudioOpenInNewTab')).'" aria-label="'.dol_escape_htmltag($langs->trans('DocStudioOpenInNewTab')).'"><svg class="ds-icon" aria-hidden="true"><use href="#ds-i-external"></use></svg></a>';
 }
 if ($provider !== null && $provider->getDownloadUrl() !== '') {
 	print '<a class="docstudio-button" href="'.dol_escape_htmltag($provider->getDownloadUrl()).'" download>'.dol_escape_htmltag($langs->trans('Download')).'</a>';

@@ -100,6 +100,11 @@ class DocStudio
 		$langs->load('docstudio@docstudio');
 
 		$this->providers['document'] = array('class' => 'DocStudioDocumentProvider', 'file' => '/docstudio/class/docstudiodocumentprovider.class.php', 'module' => 'docstudio');
+		// Attachments of the mails of inbox, read only (lot 5), when inbox gives its read-only access
+		dol_include_once('/docstudio/class/docstudioinboxprovider.class.php');
+		if (DocStudioInboxProvider::isAvailable()) {
+			$this->providers['inbox'] = array('class' => 'DocStudioInboxProvider', 'file' => '/docstudio/class/docstudioinboxprovider.class.php', 'module' => 'docstudio');
+		}
 
 		$this->addViewer(array(
 			'code' => 'pdf',

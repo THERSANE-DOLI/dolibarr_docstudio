@@ -1,5 +1,14 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.16
+
+- NEW: attachments of the mails of inbox opened by DocStudio (lot 5) :   0.16.0
+  - source « inbox », read only, through the access given by inbox (InboxAttachmentFile): rights of the user on the
+    mailbox, antivirus of inbox first, nothing written
+  - hook inboxAttachmentViewers: the viewers of DocStudio allowed for the type (office server, Office preview, PDF,
+    images, text) in « Open with… » of inbox and in its viewer window
+  - FIX: button « Open in a new tab » of a viewer shown in a dialog with an icon instead of a text arrow
+
 ## 0.15
 
 - NEW: office server (WOPI): Office and OpenDocument files opened and edited in Collabora Online (lot 4) :   0.15.0
