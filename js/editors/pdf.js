@@ -1489,7 +1489,35 @@ window.DocStudio.registerViewer('pdfedit', {
 
 		ctx.toolbar.append(toolName, fontLabel, boldLabel, sizeLabel, colorLabel, cropAllLabel, imageButton, undoZone);
 		// Bottom bar, like the image editor: active page on the left, help of the tool
-		(ctx.statusbar || ctx.toolbar).append(pageIndicator, hint);
+		// Zoom on the left like the image editor: minus, value, plus, fit to the width, actual size
+		const zoomLabel = document.createElement('span');
+		zoomLabel.className = 'ds-zoom-label';
+		const zoomTo = function (scale) {
+			pdfViewer.currentScale = Math.min(5, Math.max(0.25, scale));
+		};
+		const zoomBox = document.createElement('span');
+		zoomBox.className = 'ds-zoom';
+		zoomBox.append(
+			ctx.utils.iconButton('minus', t('DocStudioZoomOut'), function () {
+				zoomTo(pdfViewer.currentScale / 1.25);
+			}),
+			zoomLabel,
+			ctx.utils.iconButton('plus', t('DocStudioZoomIn'), function () {
+				zoomTo(pdfViewer.currentScale * 1.25);
+			}),
+			ctx.utils.iconButton('fit', t('DocStudioZoomFit'), function () {
+				pdfViewer.currentScaleValue = 'page-width';
+			}),
+			ctx.utils.button('1:1', t('DocStudioZoomActual'), function () {
+				zoomTo(1);
+			})
+		);
+		const syncZoom = function () {
+			zoomLabel.textContent = Math.round(pdfViewer.currentScale * 100) + ' %';
+		};
+		eventBus.on('scalechanging', syncZoom);
+		eventBus.on('pagesinit', syncZoom);
+		(ctx.statusbar || ctx.toolbar).append(zoomBox, pageIndicator, hint);
 		syncBold();
 
 		setDocument(pdfDocument);

@@ -2,6 +2,8 @@
 
 ## 0.13
 
+- NEW: PDF editor, zoom buttons in the status bar like the image editor (minus, value, plus, fit to the width, 1:1) :   0.13.4
+
 - NEW: PDF editor, hand like the image editor: Space held over the pages, or middle button, then drag :   0.13.3
   - no tool used meanwhile (text, drawing, zones...), Space stays a space while a text is typed
 
