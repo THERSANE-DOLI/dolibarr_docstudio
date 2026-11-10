@@ -115,7 +115,7 @@ if (!count($registry->getViewersFor($extension, $provider->getSize(), DocStudio:
 	|| $registry->getHandler($extension, $user, DocStudio::ACTION_EDIT) === DocStudio::HANDLER_NONE) {
 	docstudioSaveAnswer(array('error' => $langs->transnoentitiesnoconv('DocStudioErrorNoEditor')), 403);
 }
-if (!$provider->canWrite($user)) {
+if (!$provider->canWrite($user) || ($mode === 'replace' && !$provider->canReplaceInPlace())) {
 	docstudioSaveAnswer(array('error' => $langs->transnoentitiesnoconv('DocStudioErrorCannotWrite')), 403);
 }
 

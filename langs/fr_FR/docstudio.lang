@@ -324,3 +324,23 @@ DocStudioWopiBadIp = Adresse IP invalide : %s
 DocStudioWopiProofOn = Signature du serveur bureautique vérifiée : chaque appel doit être signé par sa clé (clés de preuve WOPI).
 DocStudioWopiProofOff = Pas de clé de preuve publiée par le serveur bureautique : seul le jeton protège les appels. Générez-en une sur le serveur (Collabora : coolconfig generate-proof-key, ou fichier /etc/coolwsd/proof_key).
 DocStudioErrorValidatedMainDoc = C'est le document principal d'une facture validée : il ne peut pas être remplacé, enregistrez une copie.
+
+# Office installed on the computer (lot 4)
+DocStudioViewerDesktop = Office installé (Excel, Word, PowerPoint)
+DocStudioEditorDesktop = Modifier avec l'Office installé
+DocStudioDesktopTitle = Ouvrir avec %s sur cet ordinateur
+DocStudioDesktopOpen = Ouvrir dans %s
+DocStudioDesktopHelpView = %s ouvre le fichier en lecture seule : les changements faits dedans ne sont pas enregistrés dans Dolibarr.
+DocStudioDesktopHelpEdit = %s ouvre le fichier et l'enregistre à sa place dans Dolibarr. Tant qu'il y est ouvert, personne d'autre ne peut le modifier.
+DocStudioDesktopNothing = Rien ne s'ouvre ?
+DocStudioDesktopExpire = Microsoft %s doit être installé sur cet ordinateur (Windows ou macOS), et le navigateur demande d'abord s'il peut l'ouvrir. Le lien ne marche que sur cet ordinateur, jusqu'à %s. L'adresse peut aussi être collée dans Fichier > Ouvrir.
+DocStudioDesktopCopy = Copier l'adresse
+DocStudioDesktopCopied = Copiée
+DocStudioDesktopSetup = Office installé sur les ordinateurs (« Ouvrir dans Excel »)
+DocStudioDesktopEnable = Proposer « Ouvrir dans Excel, Word, PowerPoint »
+DocStudioDesktopEnableHelp = Microsoft Office installé sur l'ordinateur de l'utilisateur (Windows, macOS) ouvre le fichier par une adresse signée de %s, valable 10 heures et sur cet ordinateur seulement, et l'enregistre à sa place quand l'utilisateur peut le modifier. Office doit joindre cette adresse, comme le navigateur. Proposé dans « Ouvrir avec », jamais par défaut.
+DocStudioDesktopHttps = Dolibarr n'est pas en HTTPS : Office peut refuser d'ouvrir ou d'enregistrer les fichiers, et leur adresse passe en clair sur le réseau.
+DocStudioNoInstanceKey = L'identifiant unique de l'instance ($dolibarr_main_instance_unique_id dans conf.php) manque ou est trop court : le serveur bureautique et l'Office installé restent coupés, car leurs jetons ne pourraient pas être signés sûrement. Ajoutez une valeur aléatoire d'au moins 16 caractères dans conf.php.
+
+# Copy filed in a piece (attachment of a mail, inbox C2)
+DocStudioSaveTo = Enregistrer une copie dans %s

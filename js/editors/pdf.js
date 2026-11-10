@@ -1968,6 +1968,12 @@ window.DocStudio.registerViewer('pdfedit', {
 		compressBox.append(compressLabel, compressHelp);
 		compressBox.hidden = !ctx.config.compress;
 		form.append(heading, copyLabel, nameLabel, replaceLabel, replaceWarning, splitInfo, compressBox, impact, overwriteLabel, status, buttons);
+		// Copy filed in a piece (attachment of a mail): where it goes, no replacing
+		if (ctx.config.saveTarget) {
+			heading.textContent = t('DocStudioSaveTo', ctx.config.saveTarget);
+			copyLabel.hidden = true;
+			replaceLabel.hidden = true;
+		}
 		dialog.appendChild(form);
 		document.body.appendChild(dialog);
 

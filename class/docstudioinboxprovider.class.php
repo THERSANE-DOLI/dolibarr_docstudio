@@ -44,6 +44,15 @@ class DocStudioInboxProvider extends DocStudioFileProvider
 	/** @var int */
 	protected $force = 0;
 
+	/** @var string Type of the piece receiving the copy (« Annotate and file », C2), '' when only read */
+	protected $recordType = '';
+
+	/** @var int */
+	protected $recordId = 0;
+
+	/** @var array{type:string,id:int,kind:string,ref:string,label:string,url:string}|null Piece described by inbox */
+	protected $record = null;
+
 	/**
 	 * The module inbox is there and gives its read-only access to the attachments
 	 *
@@ -59,7 +68,7 @@ class DocStudioInboxProvider extends DocStudioFileProvider
 	 */
 	public function getRequestParams()
 	{
-		return array('mail' => 'int', 'part' => 'int', 'force' => 'int');
+		return array('mail' => 'int', 'part' => 'int', 'force' => 'int', 'record_type' => 'aZ09', 'record_id' => 'int');
 	}
 
 	/**
@@ -77,6 +86,9 @@ class DocStudioInboxProvider extends DocStudioFileProvider
 		$this->mailId = isset($params['mail']) ? (int) $params['mail'] : 0;
 		$this->part = isset($params['part']) ? (int) $params['part'] : -1;
 		$this->force = !empty($params['force']) ? 1 : 0;
+		$this->recordType = isset($params['record_type']) ? (string) $params['record_type'] : '';
+		$this->recordId = isset($params['record_id']) ? (int) $params['record_id'] : 0;
+		$this->record = null;
 		if ($this->mailId <= 0 || $this->part < 0) {
 			return 0;
 		}
@@ -88,6 +100,10 @@ class DocStudioInboxProvider extends DocStudioFileProvider
 			return $res;
 		}
 		$this->file = $file;
+		if ($this->recordType !== '' && $this->recordId > 0 && method_exists($file, 'describeRecord')) {
+			// Piece chosen in inbox: the user must be allowed to put files in it, else the attachment stays read only
+			$this->record = $file->describeRecord($fuser, $this->recordType, $this->recordId);
+		}
 
 		return 1;
 	}
@@ -134,6 +150,81 @@ class DocStudioInboxProvider extends DocStudioFileProvider
 	 */
 	public function getParams()
 	{
-		return array('mail' => $this->mailId, 'part' => $this->part, 'force' => $this->force);
+		$params = array('mail' => $this->mailId, 'part' => $this->part, 'force' => $this->force);
+		if ($this->recordType !== '' && $this->recordId > 0) {
+			$params['record_type'] = $this->recordType;
+			$params['record_id'] = $this->recordId;
+		}
+
+		return $params;
+	}
+
+	/**
+	 * Copies only, in the piece chosen in inbox: a received attachment is never changed
+	 *
+	 * @param User $fuser User
+	 * @return bool
+	 */
+	public function canWrite(User $fuser)
+	{
+		return $this->file !== null && $this->record !== null && method_exists($this->file, 'fileToRecord');
+	}
+
+	/**
+	 * @return bool
+	 */
+	public function canReplaceInPlace()
+	{
+		return false;
+	}
+
+	/**
+	 * @return array{label:string,url:string}|null
+	 */
+	public function getSaveTarget()
+	{
+		if ($this->record === null) {
+			return null;
+		}
+		$label = trim($this->record['kind'].' '.$this->record['ref'].($this->record['label'] !== '' ? ' ('.$this->record['label'].')' : ''));
+
+		return array('label' => $label, 'url' => $this->record['url']);
+	}
+
+	/**
+	 * Copy in the documents of the piece, by inbox (same rules as its « Put in the documents of »: never over an existing
+	 * file, the piece linked to the mail, journal of the mailbox)
+	 *
+	 * @param string $tmpFile   Full path of the new content
+	 * @param string $mode      'copy' only
+	 * @param string $fileName  Name of the copy
+	 * @param bool   $overwrite Not used: inbox numbers the name instead
+	 * @param User   $fuser     User saving
+	 * @return array{result:int,error:string,exists:int,filename:string}
+	 */
+	public function save($tmpFile, $mode, $fileName, $overwrite, User $fuser)
+	{
+		if ($mode !== 'copy' || !$this->canWrite($fuser)) {
+			return array('result' => -1, 'error' => 'Not supported', 'exists' => 0, 'filename' => '');
+		}
+		$fileName = dol_sanitizeFileName((string) $fileName);
+		if ($fileName === '' || strtolower(pathinfo($fileName, PATHINFO_EXTENSION)) !== $this->getExtension()) {
+			$fileName = preg_replace('/\.[^.]*$/', '', $this->getFileName()).'.'.$this->getExtension();
+		}
+		// Antivirus of Dolibarr on the new content, like an upload
+		include_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+		$virus = dolCheckVirus($tmpFile, $fileName);
+		if (count($virus)) {
+			global $langs;
+			dol_syslog(__METHOD__.' content refused by the antivirus: '.implode(', ', $virus), LOG_WARNING);
+			return array('result' => -1, 'error' => $langs->transnoentitiesnoconv('DocStudioErrorVirus'), 'exists' => 0, 'filename' => '');
+		}
+		$content = (string) file_get_contents($tmpFile);
+		$written = $this->file->fileToRecord($fuser, $this->record['type'], $this->record['id'], $fileName, $content);
+		if ($written === '') {
+			return array('result' => -1, 'error' => $this->file->error, 'exists' => 0, 'filename' => '');
+		}
+
+		return array('result' => 1, 'error' => '', 'exists' => 0, 'filename' => $written);
 	}
 }

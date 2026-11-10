@@ -324,3 +324,23 @@ DocStudioWopiBadIp = Dirección IP no válida: %s
 DocStudioWopiProofOn = Firma del servidor ofimático comprobada: cada llamada debe estar firmada por su clave (claves de prueba WOPI).
 DocStudioWopiProofOff = El servidor ofimático no publica clave de prueba: solo el token protege las llamadas. Genere una en el servidor (Collabora: coolconfig generate-proof-key, o archivo /etc/coolwsd/proof_key).
 DocStudioErrorValidatedMainDoc = Es el documento principal de una factura validada: no se puede sustituir, guarde una copia.
+
+# Office installed on the computer (lot 4)
+DocStudioViewerDesktop = Office instalado (Excel, Word, PowerPoint)
+DocStudioEditorDesktop = Editar con el Office instalado
+DocStudioDesktopTitle = Abrir con %s en este ordenador
+DocStudioDesktopOpen = Abrir en %s
+DocStudioDesktopHelpView = %s abre el archivo en solo lectura: los cambios hechos allí no se guardan en Dolibarr.
+DocStudioDesktopHelpEdit = %s abre el archivo y lo guarda en su lugar en Dolibarr. Mientras está abierto allí, nadie más puede modificarlo.
+DocStudioDesktopNothing = ¿No se abre nada?
+DocStudioDesktopExpire = Microsoft %s debe estar instalado en este ordenador (Windows o macOS), y el navegador pregunta primero si puede abrirlo. El enlace solo funciona en este ordenador, hasta las %s. La dirección también se puede pegar en Archivo > Abrir.
+DocStudioDesktopCopy = Copiar la dirección
+DocStudioDesktopCopied = Copiada
+DocStudioDesktopSetup = Office instalado en los ordenadores (« Abrir en Excel »)
+DocStudioDesktopEnable = Proponer « Abrir en Excel, Word, PowerPoint »
+DocStudioDesktopEnableHelp = Microsoft Office instalado en el ordenador del usuario (Windows, macOS) abre el archivo mediante una dirección firmada de %s, válida 10 horas y solo en ese ordenador, y lo guarda en su lugar cuando el usuario puede editarlo. Office debe alcanzar esta dirección, como el navegador. Propuesto en « Abrir con », nunca por defecto.
+DocStudioDesktopHttps = Dolibarr no está en HTTPS: Office puede negarse a abrir o guardar los archivos, y su dirección pasa en claro por la red.
+DocStudioNoInstanceKey = Falta el identificador único de la instancia ($dolibarr_main_instance_unique_id en conf.php) o es demasiado corto: el servidor ofimático y el Office instalado quedan desactivados, porque sus tokens no podrían firmarse de forma segura. Añada en conf.php un valor aleatorio de al menos 16 caracteres.
+
+# Copy filed in a piece (attachment of a mail, inbox C2)
+DocStudioSaveTo = Guardar una copia en %s

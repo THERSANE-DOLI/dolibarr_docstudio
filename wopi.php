@@ -20,6 +20,7 @@
  * \ingroup docstudio
  * \brief   WOPI host: called by the office server (server to server, no session of Dolibarr).
  *
+ *   (wopi.php/{entity}/files/{id}... since 0.18.0, wopi.php/files/{id}?entity=... still read)
  *   GET  wopi.php/files/{id}?access_token=...            CheckFileInfo
  *   GET  wopi.php/files/{id}/contents?access_token=...   GetFile
  *   POST wopi.php/files/{id}/contents?access_token=...   PutFile (mode edit, lock of the editor)
@@ -58,6 +59,9 @@ if (!defined('NOIPCHECK')) {
 }
 // Entity of the file (multicompany), checked against the token below. Before main.inc.php: GETPOST is not there yet
 $entity = (!empty($_GET['entity']) ? (int) $_GET['entity'] : 1);
+if (isset($_SERVER['PATH_INFO']) && preg_match('#^/(\d{1,6})/files/#', (string) $_SERVER['PATH_INFO'], $wopiEntity)) {
+	$entity = (int) $wopiEntity[1];
+}
 if ($entity > 0) {
 	define('DOLENTITY', $entity);
 }
@@ -131,7 +135,7 @@ if (!isModEnabled('docstudio') || !DocStudioWopi::isEnabled()) {
 
 // Route: /files/{id} or /files/{id}/contents
 $path = isset($_SERVER['PATH_INFO']) ? (string) $_SERVER['PATH_INFO'] : '';
-if (!preg_match('#^/files/([a-f0-9]{32})(/contents)?$#', $path, $m)) {
+if (!preg_match('#^(?:/\d{1,6})?/files/([a-f0-9]{32})(/contents)?$#', $path, $m)) {
 	docstudioWopiAnswer(404);
 }
 $fileId = $m[1];
@@ -150,6 +154,14 @@ $token = isset($_GET['access_token']) ? (string) $_GET['access_token'] : '';
 // Signature of the office server: the call comes from it, not from someone holding a token
 $wopiTools = new DocStudioWopi();
 $proofKeys = $wopiTools->getProofKeys();
+if (!count($proofKeys) && DocStudioWopi::isProofExpected()) {
+	// The office server signed its calls before: a discovery without key now (server down, key removed) does not
+	// turn the check off
+	dol_syslog('docstudio/wopi.php refused: proof keys of the office server expected but not readable ('.$wopiTools->error.')', LOG_WARNING);
+	if (!getDolGlobalInt('DOCSTUDIO_WOPI_PROOF_OFF')) {
+		docstudioWopiAnswer(401);
+	}
+}
 if (count($proofKeys)) {
 	$host = isset($_SERVER['HTTP_HOST']) ? (string) $_SERVER['HTTP_HOST'] : '';
 	$uri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
@@ -178,7 +190,8 @@ if (count($proofKeys)) {
 }
 
 $data = DocStudioWopi::checkToken($token, $fileId);
-if ($data === null || (int) $data['e'] !== (int) $conf->entity) {
+// A token of the desktop Office (dav.php) is not one of the office server
+if ($data === null || (int) $data['e'] !== (int) $conf->entity || !empty($data['k'])) {
 	docstudioWopiAnswer(401);
 }
 
@@ -206,7 +219,7 @@ if (DocStudioWopi::fileId((string) $data['s'], $provider->getParams(), (int) $co
 	docstudioWopiAnswer(404);
 }
 $extension = $provider->getExtension();
-$canWrite = $data['m'] === 'edit' && in_array($extension, DocStudioWopi::WRITABLE_EXTENSIONS, true) && $provider->canWrite($wuser);
+$canWrite = $data['m'] === 'edit' && in_array($extension, DocStudioWopi::WRITABLE_EXTENSIONS, true) && $provider->canReplaceInPlace() && $provider->canWrite($wuser);
 $modified = $provider->getModifiedTime();
 $version = (string) $modified.'-'.$provider->getSize();
 

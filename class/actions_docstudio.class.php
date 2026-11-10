@@ -97,6 +97,30 @@ class ActionsDocStudio extends CommonHookActions
 		}
 		$this->results['inboxAttachmentViewers'] = $out;
 
+		// « Annotate and file » (C2): the editors saving through DocStudio, inbox adds the piece chosen to the address
+		$editors = array();
+		if (empty($user->socid)) {
+			foreach ($parameters['attachments'] as $part => $a) {
+				$extension = isset($a['extension']) ? (string) $a['extension'] : '';
+				if ($registry->getHandler($extension, $user, DocStudio::ACTION_EDIT) === DocStudio::HANDLER_NONE) {
+					continue;
+				}
+				$list = $registry->getViewersFor($extension, isset($a['size']) ? (int) $a['size'] : 0, DocStudio::ACTION_EDIT);
+				$list = array_intersect_key($list, array_flip($registry->getUserChoices($extension, DocStudio::ACTION_EDIT)));
+				foreach ($list as $code => $viewer) {
+					if (!empty($viewer['inplace'])) {
+						continue;
+					}
+					$editors[(int) $part][] = array(
+						'code' => $code,
+						'label' => $viewer['label'],
+						'url' => DocStudio::buildUrl('edit.php', 'inbox', array('mail' => (int) $parameters['mail'], 'part' => (int) $part, 'force' => 0)).'&viewer='.rawurlencode($code),
+					);
+				}
+			}
+		}
+		$this->results['inboxAttachmentEditors'] = $editors;
+
 		return 0;
 	}
 

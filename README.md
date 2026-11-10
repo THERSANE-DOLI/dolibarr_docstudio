@@ -16,6 +16,10 @@ View the documents of Dolibarr without leaving it.
 - PDF editor, without any server: texts (fonts of the setup), drawing, highlight (also straight lines), images,
   pages (rotate, delete, reorder, split into several files), crop and redaction (pages redacted turned into images, result checked). Saved as a copy or instead of the
   original, with the permission to change the documents of the object.
+- Office server (optional): Collabora Online, OnlyOffice or Euro-Office (WOPI) open and edit the Office and
+  OpenDocument files in place, signature of their calls checked.
+- Office installed on the computer (optional): « Open in Excel, Word, PowerPoint » by a signed address valid on
+  that computer only (small WebDAV server `dav.php`), saved in place.
 - Same permissions as the download: a user who cannot download a file cannot view it.
 - Other modules can add viewers for other file types, and sources of files other than the documents of Dolibarr.
 

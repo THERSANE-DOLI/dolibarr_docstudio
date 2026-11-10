@@ -91,6 +91,11 @@ if ($provider !== null) {
 		$provider = null;
 	}
 }
+// Copy filed elsewhere (attachment of a mail filed in a piece): back to that piece after the saving
+$saveTarget = $provider !== null ? $provider->getSaveTarget() : null;
+if ($backtopage === '' && $saveTarget !== null && preg_match('/^\/(?!\/)/', $saveTarget['url'])) {
+	$backtopage = $saveTarget['url'];
+}
 if ($backtopage === '') {
 	$backtopage = DOL_URL_ROOT.'/index.php';
 }
@@ -112,6 +117,11 @@ $viewers = $provider !== null ? $registry->getViewersFor($provider->getExtension
 $defaultViewer = '';
 if ($provider !== null) {
 	$viewers = array_intersect_key($viewers, array_flip($registry->getUserChoices($provider->getExtension(), DocStudio::ACTION_EDIT)));
+	if (!$provider->canReplaceInPlace()) {
+		$viewers = array_filter($viewers, function ($viewer) {
+			return empty($viewer['inplace']);
+		});
+	}
 	$handler = $registry->getHandler($provider->getExtension(), $user, DocStudio::ACTION_EDIT);
 	$defaultViewer = isset($viewers[$handler]) ? $handler : '';
 }
@@ -193,12 +203,16 @@ if ($provider !== null && count($viewers)) {
 		'token' => currentToken(),
 		'backUrl' => $backtopage,
 		// Main document of a validated invoice: saved as a copy only (audit DSTU-004)
-		'canReplace' => !(method_exists($provider, 'isMainDocumentOfValidatedInvoice') && $provider->isMainDocumentOfValidatedInvoice() && !getDolGlobalInt('DOCSTUDIO_ALLOW_REPLACE_VALIDATED')),
+		'canReplace' => $provider->canReplaceInPlace() && !(method_exists($provider, 'isMainDocumentOfValidatedInvoice') && $provider->isMainDocumentOfValidatedInvoice() && !getDolGlobalInt('DOCSTUDIO_ALLOW_REPLACE_VALIDATED')),
+		// Copy filed in a piece (attachment of a mail): the saving says where, no replacing
+		'saveTarget' => $saveTarget !== null ? $saveTarget['label'] : '',
 		'copyName' => preg_replace('/\.[^.]*$/', '', $provider->getFileName()).'-'.dol_sanitizeFileName($langs->transnoentitiesnoconv('DocStudioCopySuffix')).'.'.$provider->getExtension(),
 		'compress' => DocStudioPdfTools::canCompress(),
 		'processUrl' => DocStudio::buildUrl('ajax/process.php', $source, $provider->getParams()),
 		'themeUrl' => dol_buildpath('/docstudio/ajax/theme.php', 1),
 		'wopi' => docstudioWopiConfig($registry, $source, $provider, $viewers, 'wopiedit', 'edit'),
+		// Office installed on the computer: ms-excel: link to dav.php
+		'desktop' => docstudioDesktopConfig($source, $provider, $viewers, 'desktopedit', 'edit'),
 		'fonts' => DocStudioFonts::forEditor(),
 		'fontkit' => dol_buildpath('/docstudio/vendor/fontkit/fontkit.umd.min.js', 1),
 		'imageMimeTypes' => DocStudio::getImageMimeTypes(),
@@ -222,7 +236,7 @@ if ($provider !== null && count($viewers)) {
 			'DocStudioPdfPassword', 'DocStudioRows', 'DocStudioRowsTruncated', 'DocStudioWrapLines', 'DocStudioEncoding',
 			'DocStudioThumbnails', 'DocStudioSearch', 'DocStudioSearchPrevious', 'DocStudioSearchNext', 'DocStudioSearchResults',
 			'DocStudioSearchNone', 'DocStudioPrint', 'DocStudioPreparingPrint',
-			'DocStudioSaveAs', 'DocStudioSaveCopy', 'DocStudioSaveReplace', 'DocStudioSaveReplaceWarning', 'DocStudioFileName',
+			'DocStudioSaveAs', 'DocStudioSaveTo', 'DocStudioSaveCopy', 'DocStudioSaveReplace', 'DocStudioSaveReplaceWarning', 'DocStudioFileName',
 			'DocStudioSave', 'DocStudioCancel', 'DocStudioSaving', 'DocStudioFileExists', 'DocStudioOverwrite', 'DocStudioUnsaved',
 			'DocStudioErrorSave', 'DocStudioErrorValidatedMainDoc', 'DocStudioToolSelect', 'DocStudioToolText', 'DocStudioToolDraw', 'DocStudioToolHighlight',
 			'DocStudioToolImage', 'DocStudioToolRedact', 'DocStudioToolCrop', 'DocStudioPages', 'DocStudioRotate',
@@ -256,6 +270,7 @@ if ($provider !== null && count($viewers)) {
 			'DocStudioCompressHelp', 'DocStudioCompressing', 'DocStudioErrorCompress',
 			// Office server
 			'DocStudioWopiUnavailable', 'DocStudioWopiSaving',
+			'DocStudioDesktopTitle', 'DocStudioDesktopOpen', 'DocStudioDesktopHelpView', 'DocStudioDesktopHelpEdit', 'DocStudioDesktopNothing', 'DocStudioDesktopCopy', 'DocStudioDesktopCopied', 'DocStudioDesktopExpire',
 			// Theme
 			'DocStudioThemeDark', 'DocStudioThemeToLight', 'DocStudioThemeToDark',
 			// Layers

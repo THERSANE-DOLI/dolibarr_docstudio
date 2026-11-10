@@ -100,6 +100,28 @@ abstract class DocStudioFileProvider
 	}
 
 	/**
+	 * The file may be replaced in place (mode 'replace', office server, desktop Office); false for a file that only
+	 * takes copies elsewhere
+	 *
+	 * @return bool
+	 */
+	public function canReplaceInPlace()
+	{
+		return true;
+	}
+
+	/**
+	 * Where the copies go when it is not next to the file (attachment of a mail filed in a piece): label shown in the
+	 * saving and page to go back to after it, null when the copy goes next to the file
+	 *
+	 * @return array{label:string,url:string}|null
+	 */
+	public function getSaveTarget()
+	{
+		return null;
+	}
+
+	/**
 	 * Save a new content for the loaded file, already checked by DocStudio (type, size, antivirus is done here)
 	 *
 	 * @param string $tmpFile   Full path of the new content (temporary file, removed by DocStudio after the call)

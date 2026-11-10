@@ -80,7 +80,30 @@ class DocStudioWopi
 	 */
 	public static function isEnabled()
 	{
-		return self::getServerUrl() !== '';
+		return self::getServerUrl() !== '' && self::hasKey();
+	}
+
+	/**
+	 * The instance has a secret to sign the tokens: unique id of conf.php long enough (a missing one would give a key
+	 * known by everyone, so the office server and the opening in the desktop Office are refused)
+	 *
+	 * @return bool
+	 */
+	public static function hasKey()
+	{
+		return strlen(self::instanceSecret()) >= 16;
+	}
+
+	/**
+	 * @return string Unique id of the instance (conf.php), '' when missing
+	 */
+	protected static function instanceSecret()
+	{
+		global $dolibarr_main_instance_unique_id, $conf;
+
+		$unique = !empty($dolibarr_main_instance_unique_id) ? $dolibarr_main_instance_unique_id : (isset($conf->file->instance_unique_id) ? $conf->file->instance_unique_id : '');
+
+		return trim((string) $unique);
 	}
 
 	/**
@@ -157,19 +180,48 @@ class DocStudioWopi
 			}
 		}
 		$xml = $this->httpGet(self::getServerUrl().'/hosting/discovery');
-		if ($xml === '') {
-			return $empty;
-		}
-		$data = array('actions' => self::parseDiscovery($xml), 'proof' => self::parseProofKeys($xml));
-		if (!count($data['actions'])) {
+		$data = $xml !== '' ? array('actions' => self::parseDiscovery($xml), 'proof' => self::parseProofKeys($xml)) : $empty;
+		if ($xml !== '' && !count($data['actions'])) {
 			$this->error = 'Discovery without actions';
+		}
+		if (!count($data['actions'])) {
+			// Office server not answering (restart, network): the last discovery read stays the reference, so its
+			// proof keys are still required
+			$old = is_readable($cache) ? json_decode((string) file_get_contents($cache), true) : null;
+			if (!$refresh && is_array($old) && isset($old['actions'])) {
+				return $old + $empty;
+			}
 			return $empty;
 		}
 		if (dol_mkdir(dirname($cache)) >= 0) {
 			@file_put_contents($cache, json_encode($data));
 		}
+		// Remembered: once the office server has signed its calls, a discovery without key is refused (wopi.php)
+		if (count($data['proof']) && getDolGlobalString('DOCSTUDIO_WOPI_PROOF_SEEN') !== self::serverHash()) {
+			global $conf;
+			require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+			dolibarr_set_const($GLOBALS['db'], 'DOCSTUDIO_WOPI_PROOF_SEEN', self::serverHash(), 'chaine', 0, '', $conf->entity);
+		}
 
 		return $data;
+	}
+
+	/**
+	 * @return string Hash of the address of the office server (a new server starts without remembered key)
+	 */
+	public static function serverHash()
+	{
+		return dol_hash(self::getServerUrl(), 'md5');
+	}
+
+	/**
+	 * The office server of the setup has already given proof keys: its calls must stay signed
+	 *
+	 * @return bool
+	 */
+	public static function isProofExpected()
+	{
+		return getDolGlobalString('DOCSTUDIO_WOPI_PROOF_SEEN') === self::serverHash();
 	}
 
 	/**
@@ -398,7 +450,8 @@ class DocStudioWopi
 		// Optional parameters of the discovery: <name=PLACEHOLDER&>, removed (WOPISrc and lang added below)
 		$urlsrc = preg_replace('/<[^>]*>/', '', $urlsrc);
 		$urlsrc = rtrim($urlsrc, '?&');
-		$src = self::getHostUrl().'/files/'.$fileId.'?entity='.((int) $entity);
+		// Entity in the path, no query string: OnlyOffice adds « ?access_token= » after the address as it is
+		$src = self::getHostUrl().'/'.((int) $entity).'/files/'.$fileId;
 
 		return $urlsrc.(strpos($urlsrc, '?') === false ? '?' : '&').'WOPISrc='.rawurlencode($src).'&lang='.rawurlencode(str_replace('_', '-', $lang));
 	}
@@ -464,11 +517,7 @@ class DocStudioWopi
 	 */
 	protected static function key()
 	{
-		global $dolibarr_main_instance_unique_id, $conf;
-
-		$unique = !empty($dolibarr_main_instance_unique_id) ? $dolibarr_main_instance_unique_id : (isset($conf->file->instance_unique_id) ? $conf->file->instance_unique_id : '');
-
-		return hash('sha256', 'docstudio-wopi|'.$unique, true);
+		return hash('sha256', 'docstudio-wopi|'.self::instanceSecret(), true);
 	}
 
 	/**
@@ -488,9 +537,10 @@ class DocStudioWopi
 	 * @param string                   $source
 	 * @param array<string,string|int> $params
 	 * @param string                   $mode   'view' or 'edit'
+	 * @param array<string,string>     $extra  Other fields signed with the token (k: kind of token, i: hash of an address)
 	 * @return array{token:string,expire:int}
 	 */
-	public static function makeToken(User $fuser, $entity, $source, array $params, $mode)
+	public static function makeToken(User $fuser, $entity, $source, array $params, $mode, array $extra = array())
 	{
 		$expire = dol_now() + self::TOKEN_TTL;
 		$payload = self::b64(json_encode(array(
@@ -501,19 +551,19 @@ class DocStudioWopi
 			'm' => $mode === 'edit' ? 'edit' : 'view',
 			'x' => $expire,
 			'f' => self::fileId($source, $params, $entity),
-		)));
+		) + $extra));
 
 		return array('token' => $payload.'.'.self::b64(hash_hmac('sha256', $payload, self::key(), true)), 'expire' => $expire);
 	}
 
 	/**
 	 * @param string $token
-	 * @param string $fileId Id of the file of the request
+	 * @param string|null $fileId Id of the file of the request, null when the caller checks it after loading the file
 	 * @return array<string,mixed>|null Content of the token, null if not valid, expired or for another file
 	 */
 	public static function checkToken($token, $fileId)
 	{
-		if (!is_string($token) || strlen($token) > 4096 || !preg_match('/^([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/', $token, $m)) {
+		if (!self::hasKey() || !is_string($token) || strlen($token) > 4096 || !preg_match('/^([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/', $token, $m)) {
 			return null;
 		}
 		if (!hash_equals(self::b64(hash_hmac('sha256', $m[1], self::key(), true)), $m[2])) {
@@ -521,7 +571,7 @@ class DocStudioWopi
 		}
 		$data = json_decode((string) base64_decode(strtr($m[1], '-_', '+/')), true);
 		if (!is_array($data) || empty($data['u']) || empty($data['x']) || (int) $data['x'] < dol_now()
-			|| !isset($data['f']) || !hash_equals((string) $data['f'], (string) $fileId) || !isset($data['p']) || !is_array($data['p'])) {
+			|| !isset($data['f']) || ($fileId !== null && !hash_equals((string) $data['f'], (string) $fileId)) || !isset($data['p']) || !is_array($data['p'])) {
 			return null;
 		}
 

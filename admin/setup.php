@@ -161,6 +161,10 @@ if ($action == 'testwopi' && DocStudioWopi::isEnabled()) {
 		$testResults['wopi'] = array(true, $langs->transnoentitiesnoconv('DocStudioWopiOk', $version !== '' ? $version : '?', implode(', ', DocStudioWopi::getExtensions('edit')), count(DocStudioWopi::getExtensions('view'))));
 		// Signature of the calls (proof keys): said, with what to do when the office server has none
 		$testResults['wopiproof'] = count($wopi->getProofKeys()) ? array(true, $langs->transnoentitiesnoconv('DocStudioWopiProofOn')) : array(false, $langs->transnoentitiesnoconv('DocStudioWopiProofOff'));
+		if (!count($wopi->getProofKeys())) {
+			// Key removed on purpose by the administrator, seen by this test: no longer required by wopi.php
+			dolibarr_del_const($db, 'DOCSTUDIO_WOPI_PROOF_SEEN', $conf->entity);
+		}
 	} else {
 		$testResults['wopi'] = array(false, $langs->transnoentitiesnoconv('DocStudioWopiKo', $wopi->error));
 	}
@@ -264,6 +268,10 @@ foreach ($testResults as $key => $res) {
 print '<br><a id="docstudio-wopi"></a>';
 print load_fiche_titre($langs->trans("DocStudioWopiServer"), '', '');
 print '<p class="opacitymedium">'.$langs->trans('DocStudioWopiServerHelp').'</p>';
+if (!DocStudioWopi::hasKey()) {
+	// No secret to sign the tokens (audit DSTU-011): office server and desktop Office stay off
+	print info_admin($langs->trans('DocStudioNoInstanceKey'), 0, 0, 'error');
+}
 print '<form method="POST" action="'.dol_escape_htmltag($_SERVER['PHP_SELF']).'">';
 print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="updatewopi">';
@@ -292,6 +300,20 @@ foreach (array('wopi', 'wopiproof') as $key) {
 		print '<div class="'.($res[0] ? 'ok' : ($warn ? 'warning' : 'error')).' margintoponly">'.img_picto('', $res[0] ? 'tick' : ($warn ? 'warning' : 'error'), 'class="pictofixedwidth"').dol_escape_htmltag($res[1]).'</div>';
 		unset($testResults[$key]);
 	}
+}
+
+// Office installed on the computer (« Open in Excel »)
+print '<br><a id="docstudio-desktop"></a>';
+print load_fiche_titre($langs->trans("DocStudioDesktopSetup"), '', '');
+print '<div class="div-table-responsive-no-min">';
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre"><td>'.$langs->trans("Parameter").'</td><td class="right">'.$langs->trans("Status").'</td></tr>';
+print '<tr class="oddeven"><td>'.$langs->trans('DocStudioDesktopEnable').'<br><span class="opacitymedium small">'.$langs->trans('DocStudioDesktopEnableHelp', dol_escape_htmltag(dol_buildpath('/docstudio/dav.php', 2))).'</span></td>';
+print '<td class="right">'.ajax_constantonoff('DOCSTUDIO_DESKTOP_OFFICE', array(), $conf->entity).'</td></tr>';
+print '</table>';
+print '</div>';
+if (getDolGlobalInt('DOCSTUDIO_DESKTOP_OFFICE') && strpos(dol_buildpath('/', 2), 'https://') !== 0) {
+	print info_admin($langs->trans('DocStudioDesktopHttps'), 0, 0, 'warning');
 }
 
 // What redaction really does, written where the tools are chosen (analysis 5.1)

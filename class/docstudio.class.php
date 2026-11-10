@@ -180,6 +180,28 @@ class DocStudio
 				'script' => '/docstudio/js/viewers/wopi.js',
 				'priority' => 60,
 				'mode' => self::ACTION_EDIT,
+				'inplace' => true,
+			), 'docstudio');
+		}
+
+		// Office installed on the computer (ms-excel: links and dav.php): an offer, never the default (lot 4)
+		dol_include_once('/docstudio/class/docstudiodesktop.class.php');
+		if (DocStudioDesktop::isEnabled()) {
+			$this->addViewer(array(
+				'code' => 'desktop',
+				'label' => $langs->trans('DocStudioViewerDesktop'),
+				'extensions' => DocStudioDesktop::getExtensions('view'),
+				'script' => '/docstudio/js/viewers/desktop.js',
+				'priority' => 5,
+			), 'docstudio');
+			$this->addViewer(array(
+				'code' => 'desktopedit',
+				'label' => $langs->trans('DocStudioEditorDesktop'),
+				'extensions' => DocStudioDesktop::getExtensions('edit'),
+				'script' => '/docstudio/js/viewers/desktop.js',
+				'priority' => 5,
+				'mode' => self::ACTION_EDIT,
+				'inplace' => true,
 			), 'docstudio');
 		}
 
@@ -324,6 +346,9 @@ class DocStudio
 			'maxsize' => isset($viewer['maxsize']) ? (int) $viewer['maxsize'] : 0,
 			'module' => $module,
 			'mode' => $mode,
+			// Editor that writes the file in place by itself (office server, desktop Office), not by the saving of
+			// DocStudio: never offered for a file that only takes copies elsewhere (attachment of a mail)
+			'inplace' => !empty($viewer['inplace']),
 		);
 
 		return true;

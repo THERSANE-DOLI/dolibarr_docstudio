@@ -314,7 +314,8 @@ class DocStudioSecurityTest extends TestCase
 		$registry = new DocStudio($db);
 		$this->assertArrayHasKey('pdf', $registry->getViewersFor('pdf', 1000));
 		$this->assertArrayHasKey('image', $registry->getViewersFor('svg', 1000));
-		$this->assertSame(array('csv', 'text'), array_keys($registry->getViewersFor('csv', 1000)));
+		// The desktop Office is an option of the setup (Excel opens a CSV read only)
+		$this->assertSame(array('csv', 'text'), array_values(array_diff(array_keys($registry->getViewersFor('csv', 1000)), array('desktop'))));
 		$this->assertCount(0, $registry->getViewersFor('noexe', 10));
 		$this->assertCount(0, $registry->getViewersFor('exe', 10));
 		$this->assertCount(0, $registry->getViewersFor('txt', DocStudio::MAX_TEXT_SIZE + 1));

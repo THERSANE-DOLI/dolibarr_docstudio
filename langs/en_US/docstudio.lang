@@ -324,3 +324,23 @@ DocStudioWopiBadIp = Invalid IP address: %s
 DocStudioWopiProofOn = Signature of the office server checked: every call must be signed by its key (WOPI proof keys).
 DocStudioWopiProofOff = No proof key published by the office server: only the token protects the calls. Generate one on the server (Collabora: coolconfig generate-proof-key, or file /etc/coolwsd/proof_key).
 DocStudioErrorValidatedMainDoc = This is the main document of a validated invoice: it cannot be replaced, save a copy.
+
+# Office installed on the computer (lot 4)
+DocStudioViewerDesktop = Office installed (Excel, Word, PowerPoint)
+DocStudioEditorDesktop = Edit with the Office installed
+DocStudioDesktopTitle = Open with %s on this computer
+DocStudioDesktopOpen = Open in %s
+DocStudioDesktopHelpView = %s opens the file read only: changes made there are not saved in Dolibarr.
+DocStudioDesktopHelpEdit = %s opens the file and saves it in place in Dolibarr. While it is open there, nobody else can change it.
+DocStudioDesktopNothing = Nothing opens?
+DocStudioDesktopExpire = Microsoft %s must be installed on this computer (Windows or macOS), and the browser first asks whether it may open it. The link works on this computer only, until %s. The address can also be pasted in File > Open.
+DocStudioDesktopCopy = Copy the address
+DocStudioDesktopCopied = Copied
+DocStudioDesktopSetup = Office installed on the computers (« Open in Excel »)
+DocStudioDesktopEnable = Offer « Open in Excel, Word, PowerPoint »
+DocStudioDesktopEnableHelp = Microsoft Office installed on the computer of the user (Windows, macOS) opens the file by a signed address of %s, valid 10 hours and on that computer only, and saves it in place when the user may edit it. Office must reach this address, like the browser. Offered in « Open with », never by default.
+DocStudioDesktopHttps = Dolibarr is not in HTTPS: Office may refuse to open or save the files, and their address goes in clear on the network.
+DocStudioNoInstanceKey = The unique id of the instance ($dolibarr_main_instance_unique_id in conf.php) is missing or too short: the office server and the desktop Office stay off, because their tokens could not be signed safely. Add a random value of at least 16 characters in conf.php.
+
+# Copy filed in a piece (attachment of a mail, inbox C2)
+DocStudioSaveTo = Save a copy in %s

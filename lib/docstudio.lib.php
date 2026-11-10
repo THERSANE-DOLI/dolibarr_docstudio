@@ -123,6 +123,34 @@ function docstudioWopiConfig($registry, $source, $provider, $viewers, $code, $mo
 }
 
 /**
+ * Opening in the desktop Office for the page of a viewer or an editor: the link (ms-excel:...) and its address
+ *
+ * @param string                $source
+ * @param DocStudioFileProvider $provider
+ * @param array<string,mixed>   $viewers  Viewers offered on the page
+ * @param string                $code     'desktop' or 'desktopedit'
+ * @param string                $mode     'view' or 'edit'
+ * @return array<string,string|int>|null
+ */
+function docstudioDesktopConfig($source, $provider, $viewers, $code, $mode)
+{
+	global $conf, $user;
+
+	if (!isset($viewers[$code])) {
+		return null;
+	}
+	dol_include_once('/docstudio/class/docstudiodesktop.class.php');
+	$canWrite = $mode === 'edit' && $provider->canReplaceInPlace() && $provider->canWrite($user);
+	$link = DocStudioDesktop::makeLink($user, (int) $conf->entity, $source, $provider->getParams(), $provider->getFileName(), $canWrite ? 'edit' : 'view', isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '');
+	if ($link === null) {
+		return null;
+	}
+	$link['edit'] = $canWrite && strpos($link['link'], ':ofe|') !== false ? 1 : 0;
+
+	return $link;
+}
+
+/**
  * Headers of the raw content of a file: always a download of unknown type, never run nor shown by the browser,
  * even when its URL is opened directly or embedded by another site
  *

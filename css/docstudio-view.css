@@ -1555,3 +1555,63 @@ html.ds-theme-fading *::after {
 	border: 0;
 	background: var(--ds-surface);
 }
+
+/* Office installed on the computer (lot 4) */
+.docstudio-desktop {
+	max-width: 560px;
+	margin: 48px auto;
+	padding: 24px;
+	text-align: center;
+	color: var(--ds-text);
+}
+
+.docstudio-desktop h2 {
+	margin: 0 0 8px;
+	font-size: 1.25rem;
+	font-weight: 600;
+}
+
+.docstudio-desktop p {
+	margin: 0 0 20px;
+	color: var(--ds-muted);
+	line-height: 1.45;
+}
+
+.docstudio-desktop > .docstudio-button {
+	display: inline-flex;
+	padding: 10px 20px;
+	font-size: 1rem;
+	text-decoration: none;
+}
+
+.docstudio-desktop details {
+	margin-top: 28px;
+	text-align: left;
+}
+
+.docstudio-desktop summary {
+	cursor: pointer;
+	color: var(--ds-muted);
+	text-align: center;
+}
+
+.docstudio-desktop details p {
+	margin: 12px 0;
+}
+
+.docstudio-desktop-url {
+	display: flex;
+	gap: 8px;
+}
+
+.docstudio-desktop-url input {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 6px 8px;
+	border: 1px solid var(--ds-border);
+	border-radius: 4px;
+	background: var(--ds-surface);
+	color: var(--ds-text);
+	font-family: monospace;
+	font-size: 0.85rem;
+}

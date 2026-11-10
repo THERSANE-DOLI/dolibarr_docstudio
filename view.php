@@ -188,6 +188,8 @@ if ($provider !== null && count($viewers)) {
 		),
 		// Office server (WOPI): address of its page for this file and the token it sends back to wopi.php
 		'wopi' => docstudioWopiConfig($registry, $source, $provider, $viewers, 'wopi', 'view'),
+		// Office installed on the computer: ms-excel: link to dav.php
+		'desktop' => docstudioDesktopConfig($source, $provider, $viewers, 'desktop', 'view'),
 		// Office viewer: entry modules of @silurus/ooxml (its workers and WASM files are found next to them)
 		'ooxml' => array(
 			'docx' => dol_buildpath('/docstudio/vendor/ooxml/docx.mjs', 1),
@@ -201,6 +203,7 @@ if ($provider !== null && count($viewers)) {
 			'DocStudioThumbnails', 'DocStudioSearch', 'DocStudioSearchPrevious', 'DocStudioSearchNext', 'DocStudioSearchResults',
 			'DocStudioSearchNone', 'DocStudioPrint', 'DocStudioPreparingPrint', 'DocStudioSlide', 'DocStudioSheet', 'DocStudioOfficeError',
 			'DocStudioWopiUnavailable', 'DocStudioWopiSaving',
+			'DocStudioDesktopTitle', 'DocStudioDesktopOpen', 'DocStudioDesktopHelpView', 'DocStudioDesktopHelpEdit', 'DocStudioDesktopNothing', 'DocStudioDesktopCopy', 'DocStudioDesktopCopied', 'DocStudioDesktopExpire',
 		)),
 	);
 	docstudioPrintJsonData('docstudio-config', $config);

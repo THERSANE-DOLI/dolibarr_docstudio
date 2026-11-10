@@ -1,5 +1,39 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.19
+
+- NEW: editors, copy filed in a piece for a file that only takes copies elsewhere (attachment of a mail) :   0.19.0
+  - « Annotate and file » of inbox: the PDF or image editor opens on the attachment (read only), the saving puts
+    a copy in the documents of the piece chosen in inbox, the mail stays as it is
+  - the saving says where the copy goes (« Save a copy in Thirdparty ACME »), no replacing, back to the piece after
+  - editors that write in place by themselves (office server, desktop Office) not offered for such a file
+  - providers: canReplaceInPlace() and getSaveTarget() (default: in place allowed, copy next to the file)
+
+## 0.18
+
+- FIX: office server, address of the file with the entity in its path (OnlyOffice and Euro-Office) :   0.18.2
+  - OnlyOffice adds « ?access_token= » after the address as it is: « ?entity= » made the token unreadable (401)
+  - wopi.php/{entity}/files/{id}, the old wopi.php/files/{id}?entity= still read (Collabora sessions open)
+  - tested with Collabora CODE 26.04, OnlyOffice Document Server 10.0 and Euro-Office 9.3.7: read, edit, lock,
+    saving in Dolibarr, signature of the calls checked
+
+- FIX: security audit 2026-11-10-b, points DSTU-010 and DSTU-011 :   0.18.1
+  - signature of the office server still required when its discovery cannot be read again (server down): the last
+    one read stays the reference, and once a key was seen a call without signature is refused (the Test button of
+    the setup forgets the key when the office server has none any more)
+  - no office server nor desktop Office when the unique id of the instance (conf.php) is missing or too short: their
+    tokens would be signed with a key known by everyone; said in the setup
+
+- NEW: « Open in Excel, Word, PowerPoint » with the Office installed on the computer :   0.18.0
+  - option of the setup, off by default; offered in « Open with » (reading) and in the editors (editing) of the
+    Office and OpenDocument types, never by default, for the types the administrator allows
+  - links ms-excel:, ms-word:, ms-powerpoint: to a small WebDAV server (dav.php): read, lock, write back in place
+    (docx, xlsx, pptx, odt, ods, odp; doc, xls, ppt and csv read only)
+  - signed address valid 10 hours, for the computer that asked for it only (hash of its address in the token),
+    rights of the user read again at each call, locks shared with the office server (never both writing)
+  - saving checked like the office server: ZIP package of the type, size, hook docstudioBeforeSave, antivirus
+  - never: creating, deleting, moving or copying a file through dav.php
+
 ## 0.17
 
 - FIX: security audit of 0.10.2, points left (DSTU-003, 004, 005, 006, 009) :   0.17.1
