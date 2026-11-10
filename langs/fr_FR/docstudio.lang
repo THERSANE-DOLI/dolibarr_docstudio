@@ -297,3 +297,9 @@ DocStudioGhostscriptKo = Ghostscript ne répond pas : %s
 DocStudioStirlingBadUrl = Adresse de Stirling PDF invalide : elle doit commencer par http:// ou https://.
 DocStudioGhostscriptBadPath = Chemin de Ghostscript invalide : indiquez seulement le chemin de l'exécutable, sans option.
 DocStudioRedactionSetupHelp = Caviardage dans l'éditeur PDF : chaque page qui porte une zone caviardée est remplacée par une image de la page, puis DocStudio vérifie que le texte masqué n'est plus dans le fichier. Sur ces pages, le texte n'est plus sélectionnable, copiable ni trouvable, les liens et champs de formulaire disparaissent et le fichier est plus lourd ; les autres pages ne changent pas. Le nouveau fichier ne garde ni métadonnées, ni signets, ni pièces jointes, ni versions précédentes. Un rectangle posé avec l'outil Dessin n'est pas un caviardage : n'importe quel lecteur PDF peut le retirer. Remplacer l'original ne change pas les copies déjà envoyées ou classées ailleurs, et une signature électronique du PDF est perdue. Stirling PDF n'est pas utilisé pour caviarder : son caviardage par zones pose un rectangle sur le texte sans le retirer du fichier.
+
+# Office viewer (lot 3)
+DocStudioViewerOffice = Office (Word, Excel, PowerPoint)
+DocStudioSlide = Diapositive %s / %s
+DocStudioSheet = Feuille %s / %s
+DocStudioOfficeError = Ce document Office ne peut pas être affiché ici (protégé par un mot de passe, abîmé ou trop gros). Téléchargez-le pour l'ouvrir.

@@ -1536,3 +1536,11 @@ html.ds-theme-fading *::after {
 	cursor: grabbing !important;
 	user-select: none;
 }
+
+/* Office viewer (lot 3): the renderer owns its scroll host, it needs a bounded height */
+
+.docstudio-office {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+}

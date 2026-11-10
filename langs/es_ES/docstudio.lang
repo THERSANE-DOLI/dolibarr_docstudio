@@ -297,3 +297,9 @@ DocStudioGhostscriptKo = Ghostscript no responde: %s
 DocStudioStirlingBadUrl = Dirección de Stirling PDF no válida: debe empezar por http:// o https://.
 DocStudioGhostscriptBadPath = Ruta de Ghostscript no válida: indique solo la ruta del ejecutable, sin opciones.
 DocStudioRedactionSetupHelp = Censura en el editor PDF: cada página con una zona censurada se sustituye por una imagen de la página, y DocStudio comprueba que el texto oculto ya no está en el archivo. En esas páginas el texto ya no se puede seleccionar, copiar ni buscar, los enlaces y campos de formulario desaparecen y el archivo pesa más; las demás páginas no cambian. El nuevo archivo no conserva metadatos, marcadores, adjuntos ni versiones anteriores. Un rectángulo dibujado con la herramienta Dibujo no es una censura: cualquier lector PDF puede quitarlo. Sustituir el original no cambia las copias ya enviadas o archivadas en otro lugar, y una firma electrónica del PDF se pierde. Stirling PDF no se usa para censurar: su censura por zonas pone un rectángulo sobre el texto sin quitarlo del archivo.
+
+# Office viewer (lot 3)
+DocStudioViewerOffice = Office (Word, Excel, PowerPoint)
+DocStudioSlide = Diapositiva %s / %s
+DocStudioSheet = Hoja %s / %s
+DocStudioOfficeError = Este documento de Office no se puede mostrar aquí (protegido con contraseña, dañado o demasiado grande). Descárguelo para abrirlo.

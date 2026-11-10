@@ -85,4 +85,6 @@ GPLv3 or (at your option) any later version. See file COPYING for more informati
 - pdf-lib 1.17.1 (Andrew Dillon, MIT), in `vendor/pdflib`.
 - @pdf-lib/fontkit 1.1.1 (Devon Govett, Andrew Dillon, MIT), in `vendor/fontkit`.
 - Fabric.js 7.4.0 (Fabric.js contributors, MIT), in `vendor/fabric`.
+- @silurus/ooxml 0.89.8 (Yuki Yokotani, MIT), in `vendor/ooxml` (its own third-party notices in
+  `vendor/ooxml/THIRD_PARTY_NOTICES.md`).
 - Tabler Icons 3.50.0 (Pawel Kuna, MIT), some icons in `img/docstudio-icons.svg`.

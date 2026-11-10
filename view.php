@@ -180,12 +180,18 @@ if ($provider !== null && count($viewers)) {
 			'wasmUrl' => dol_buildpath('/docstudio/vendor/pdfjs/wasm/', 1),
 			'iccUrl' => dol_buildpath('/docstudio/vendor/pdfjs/iccs/', 1),
 		),
+		// Office viewer: entry modules of @silurus/ooxml (its workers and WASM files are found next to them)
+		'ooxml' => array(
+			'docx' => dol_buildpath('/docstudio/vendor/ooxml/docx.mjs', 1),
+			'xlsx' => dol_buildpath('/docstudio/vendor/ooxml/xlsx.mjs', 1),
+			'pptx' => dol_buildpath('/docstudio/vendor/ooxml/pptx.mjs', 1),
+		),
 		'langs' => docstudioJsTranslations(array(
 			'DocStudioLoading', 'DocStudioErrorLoading', 'DocStudioErrorNoViewer', 'DocStudioOpeningCancelled',
 			'DocStudioZoomIn', 'DocStudioZoomOut', 'DocStudioZoomFit', 'DocStudioZoomActual', 'DocStudioPage',
 			'DocStudioPdfPassword', 'DocStudioRows', 'DocStudioRowsTruncated', 'DocStudioWrapLines', 'DocStudioEncoding',
 			'DocStudioThumbnails', 'DocStudioSearch', 'DocStudioSearchPrevious', 'DocStudioSearchNext', 'DocStudioSearchResults',
-			'DocStudioSearchNone', 'DocStudioPrint', 'DocStudioPreparingPrint',
+			'DocStudioSearchNone', 'DocStudioPrint', 'DocStudioPreparingPrint', 'DocStudioSlide', 'DocStudioSheet', 'DocStudioOfficeError',
 		)),
 	);
 	docstudioPrintJsonData('docstudio-config', $config);

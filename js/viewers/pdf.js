@@ -481,7 +481,7 @@ window.DocStudio.registerViewer('pdf', {
 
 		/* Toolbar */
 
-		const thumbsButton = ctx.utils.button('☰', ctx.t('DocStudioThumbnails'), toggleThumbs);
+		const thumbsButton = ctx.utils.iconButton('sidebar', ctx.t('DocStudioThumbnails'), toggleThumbs);
 		const printButton = ctx.utils.button(ctx.t('DocStudioPrint'), ctx.t('DocStudioPrint'), function () {
 			print(printButton);
 		});
@@ -499,10 +499,10 @@ window.DocStudio.registerViewer('pdf', {
 			}),
 			pageInfo,
 			searchInput,
-			ctx.utils.button('↑', ctx.t('DocStudioSearchPrevious'), function () {
+			ctx.utils.iconButton('chevron-up', ctx.t('DocStudioSearchPrevious'), function () {
 				nextHit(-1);
 			}),
-			ctx.utils.button('↓', ctx.t('DocStudioSearchNext'), function () {
+			ctx.utils.iconButton('chevron-down', ctx.t('DocStudioSearchNext'), function () {
 				nextHit(1);
 			}),
 			searchInfo,

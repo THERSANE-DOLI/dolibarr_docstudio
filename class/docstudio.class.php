@@ -50,6 +50,9 @@ class DocStudio
 	/** Max size of a file read by the text viewer, in bytes */
 	const MAX_TEXT_SIZE = 5242880;
 
+	/** Biggest Office file opened in the browser (the renderer also bounds what it unzips) */
+	const MAX_OFFICE_SIZE = 52428800;
+
 	/**
 	 * Biggest image the image editor saves (width x height): 50 million pixels, about 200 MB decoded by the server
 	 */
@@ -119,6 +122,14 @@ class DocStudio
 			'script' => '/docstudio/js/viewers/csv.js',
 			'priority' => 50,
 			'maxsize' => self::MAX_TEXT_SIZE,
+		), 'docstudio');
+		$this->addViewer(array(
+			'code' => 'office',
+			'label' => $langs->trans('DocStudioViewerOffice'),
+			'extensions' => array('docx', 'xlsx', 'pptx'),
+			'script' => '/docstudio/js/viewers/office.js',
+			'priority' => 50,
+			'maxsize' => self::MAX_OFFICE_SIZE,
 		), 'docstudio');
 		$this->addViewer(array(
 			'code' => 'text',

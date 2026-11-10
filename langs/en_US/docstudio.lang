@@ -297,3 +297,9 @@ DocStudioGhostscriptKo = Ghostscript does not answer: %s
 DocStudioStirlingBadUrl = Invalid address of Stirling PDF: it must start with http:// or https://.
 DocStudioGhostscriptBadPath = Invalid path of Ghostscript: give only the path of the executable, without options.
 DocStudioRedactionSetupHelp = Redaction in the PDF editor: every page with a redacted zone is replaced by an image of the page, then DocStudio checks that the hidden text is no longer in the file. On these pages the text can no longer be selected, copied nor found, links and form fields disappear and the file is heavier; the other pages do not change. The new file keeps no metadata, bookmarks, attachments nor previous versions. A rectangle drawn with the Draw tool is not a redaction: any PDF reader can remove it. Replacing the original does not change the copies already sent or filed elsewhere, and an electronic signature of the PDF is lost. Stirling PDF is not used to redact: its zone redaction puts a box over the text without removing it from the file.
+
+# Office viewer (lot 3)
+DocStudioViewerOffice = Office (Word, Excel, PowerPoint)
+DocStudioSlide = Slide %s / %s
+DocStudioSheet = Sheet %s / %s
+DocStudioOfficeError = This Office document cannot be shown here (protected by a password, damaged or too big). Download it to open it.

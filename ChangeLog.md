@@ -1,5 +1,17 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.14
+
+- NEW: Office viewer for Word (docx), Excel (xlsx) and PowerPoint (pptx) files, in the browser (lot 3) :   0.14.0
+  - magnifier on the Office files of the lists of documents (file associations: the default for these types)
+  - Word and PowerPoint: pages and slides one under the other, « Page 2 / 5 » or « Slide 1 / 3 »; Excel: the sheets
+    with their tabs, colors, merged cells and the values of the formulas saved by Excel (no new calculation)
+  - zoom (buttons, Ctrl + wheel), fit to the width (125 % at most at the opening), search with Ctrl + F
+  - read only and safe: the document is only drawn (no macro nor script runs), its links are not followed, videos do
+    not play, no font is downloaded from the Internet; files up to 50 MB, message saying to download it otherwise
+  - @silurus/ooxml 0.89.8 embedded (MIT, Rust/WASM parsers and Canvas renderer, 21 MB)
+  - FIX: PDF viewer, thumbnails and search buttons with icons instead of text characters
+
 ## 0.13
 
 - NEW: PDF editor, zoom buttons in the status bar like the image editor (minus, value, plus, fit to the width, 1:1) :   0.13.4

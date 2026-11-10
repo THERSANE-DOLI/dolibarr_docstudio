@@ -297,3 +297,9 @@ DocStudioGhostscriptKo = Ghostscript non risponde: %s
 DocStudioStirlingBadUrl = Indirizzo di Stirling PDF non valido: deve iniziare con http:// o https://.
 DocStudioGhostscriptBadPath = Percorso di Ghostscript non valido: indica solo il percorso dell'eseguibile, senza opzioni.
 DocStudioRedactionSetupHelp = Oscuramento nell'editor PDF: ogni pagina con una zona oscurata viene sostituita da un'immagine della pagina, poi DocStudio verifica che il testo nascosto non sia più nel file. Su queste pagine il testo non è più selezionabile, copiabile né ricercabile, i link e i campi dei moduli spariscono e il file è più pesante; le altre pagine non cambiano. Il nuovo file non tiene né metadati, né segnalibri, né allegati, né versioni precedenti. Un rettangolo disegnato con lo strumento Disegno non è un oscuramento: qualsiasi lettore PDF può toglierlo. Sostituire l'originale non cambia le copie già inviate o archiviate altrove, e una firma elettronica del PDF va persa. Stirling PDF non è usato per oscurare: il suo oscuramento per zone mette un rettangolo sul testo senza toglierlo dal file.
+
+# Office viewer (lot 3)
+DocStudioViewerOffice = Office (Word, Excel, PowerPoint)
+DocStudioSlide = Diapositiva %s / %s
+DocStudioSheet = Foglio %s / %s
+DocStudioOfficeError = Questo documento Office non può essere mostrato qui (protetto da password, danneggiato o troppo grande). Scaricalo per aprirlo.

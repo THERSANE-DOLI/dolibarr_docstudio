@@ -297,3 +297,9 @@ DocStudioGhostscriptKo = Ghostscript antwortet nicht: %s
 DocStudioStirlingBadUrl = Ungültige Adresse von Stirling PDF: Sie muss mit http:// oder https:// beginnen.
 DocStudioGhostscriptBadPath = Ungültiger Pfad von Ghostscript: Geben Sie nur den Pfad des Programms an, ohne Optionen.
 DocStudioRedactionSetupHelp = Schwärzung im PDF-Editor: Jede Seite mit einem geschwärzten Bereich wird durch ein Bild der Seite ersetzt, dann prüft DocStudio, dass der verborgene Text nicht mehr in der Datei ist. Auf diesen Seiten ist der Text nicht mehr auswählbar, kopierbar noch auffindbar, Links und Formularfelder verschwinden und die Datei wird größer; die anderen Seiten ändern sich nicht. Die neue Datei behält weder Metadaten, Lesezeichen, Anhänge noch frühere Versionen. Ein mit dem Zeichenwerkzeug gezeichnetes Rechteck ist keine Schwärzung: Jeder PDF-Leser kann es entfernen. Das Ersetzen des Originals ändert keine bereits gesendeten oder anderswo abgelegten Kopien, und eine elektronische Signatur des PDF geht verloren. Stirling PDF wird nicht zum Schwärzen verwendet: Seine Bereichsschwärzung legt ein Rechteck über den Text, ohne ihn aus der Datei zu entfernen.
+
+# Office viewer (lot 3)
+DocStudioViewerOffice = Office (Word, Excel, PowerPoint)
+DocStudioSlide = Folie %s / %s
+DocStudioSheet = Blatt %s / %s
+DocStudioOfficeError = Dieses Office-Dokument kann hier nicht angezeigt werden (passwortgeschützt, beschädigt oder zu groß). Laden Sie es herunter, um es zu öffnen.
