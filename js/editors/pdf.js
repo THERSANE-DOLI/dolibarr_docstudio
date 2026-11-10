@@ -193,6 +193,103 @@ window.DocStudio.registerViewer('pdfedit', {
 			pdfViewer.currentScale = Math.min(5, Math.max(0.25, pdfViewer.currentScale * factor));
 		}, { passive: false });
 
+		/* Hand: Space held (pointer over the pages) or middle button, then drag to move the view, like the image editor */
+
+		let spaceDown = false;
+		let overView = false;
+		let panning = null;
+		let justPanned = false;
+		viewerContainer.addEventListener('pointerenter', function () {
+			overView = true;
+		});
+		viewerContainer.addEventListener('pointerleave', function () {
+			overView = false;
+		});
+		function setPanReady(on) {
+			spaceDown = on;
+			viewerContainer.classList.toggle('ds-pan-ready', on);
+		}
+		function onSpace(e) {
+			if (e.code !== 'Space') {
+				return;
+			}
+			const active = document.activeElement;
+			// Typing a text (DocStudio text, text of pdf.js, a field): Space is a space
+			if (active && (active.isContentEditable || ['SELECT', 'TEXTAREA'].includes(active.tagName)
+				|| (active.tagName === 'INPUT' && !['checkbox', 'radio', 'range', 'color', 'button'].includes(active.type)))) {
+				return;
+			}
+			if (e.type === 'keydown') {
+				// Only with the pointer over the pages: elsewhere Space keeps pressing the focused button
+				if (!overView && !spaceDown) {
+					return;
+				}
+				e.preventDefault();
+				if (!spaceDown) {
+					setPanReady(true);
+				}
+			} else if (spaceDown) {
+				e.preventDefault();
+				setPanReady(false);
+			}
+		}
+		document.addEventListener('keydown', onSpace);
+		document.addEventListener('keyup', onSpace);
+		function onWindowBlur() {
+			setPanReady(false);
+		}
+		window.addEventListener('blur', onWindowBlur);
+		// Capture on the container: the editors of pdf.js and of DocStudio do not see a drag of the hand
+		viewerContainer.addEventListener('pointerdown', function (e) {
+			if (!spaceDown && e.button !== 1) {
+				return;
+			}
+			e.preventDefault();
+			e.stopPropagation();
+			panning = { id: e.pointerId, x: e.clientX, y: e.clientY, left: viewerContainer.scrollLeft, top: viewerContainer.scrollTop };
+			viewerContainer.classList.add('ds-panning');
+			try {
+				viewerContainer.setPointerCapture(e.pointerId);
+			} catch (err) {
+				// Pointer already gone: the drag ends at the next pointerup
+			}
+		}, true);
+		viewerContainer.addEventListener('pointermove', function (e) {
+			if (!panning || e.pointerId !== panning.id) {
+				return;
+			}
+			e.stopPropagation();
+			viewerContainer.scrollLeft = panning.left - (e.clientX - panning.x);
+			viewerContainer.scrollTop = panning.top - (e.clientY - panning.y);
+		}, true);
+		function endPan(e) {
+			if (!panning || e.pointerId !== panning.id) {
+				return;
+			}
+			e.stopPropagation();
+			panning = null;
+			justPanned = true;
+			viewerContainer.classList.remove('ds-panning');
+			window.setTimeout(function () {
+				justPanned = false;
+			}, 0);
+		}
+		viewerContainer.addEventListener('pointerup', endPan, true);
+		viewerContainer.addEventListener('pointercancel', endPan, true);
+		// The click that ends a move of the hand puts nothing on the page
+		viewerContainer.addEventListener('click', function (e) {
+			if (justPanned) {
+				e.preventDefault();
+				e.stopPropagation();
+			}
+		}, true);
+		viewerContainer.addEventListener('mousedown', function (e) {
+			if (e.button === 1 || spaceDown) {
+				e.preventDefault();
+				e.stopPropagation();
+			}
+		}, true);
+
 		/* Fonts */
 
 		const fontFaces = {};
@@ -1978,6 +2075,9 @@ window.DocStudio.registerViewer('pdfedit', {
 			unmount() {
 				window.removeEventListener('beforeunload', onBeforeUnload);
 				document.removeEventListener('keydown', onKey);
+				document.removeEventListener('keydown', onSpace);
+				document.removeEventListener('keyup', onSpace);
+				window.removeEventListener('blur', onWindowBlur);
 				dialog.remove();
 				pdfViewer.setDocument(null);
 				pdfDocument.destroy();

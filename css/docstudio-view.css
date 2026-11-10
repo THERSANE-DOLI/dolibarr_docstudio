@@ -1525,3 +1525,14 @@ html.ds-theme-fading *::after {
 .ds-img-scroller.ds-panning canvas {
 	cursor: grabbing !important;
 }
+
+.ds-edit-viewer.ds-pan-ready,
+.ds-edit-viewer.ds-pan-ready * {
+	cursor: grab !important;
+}
+
+.ds-edit-viewer.ds-panning,
+.ds-edit-viewer.ds-panning * {
+	cursor: grabbing !important;
+	user-select: none;
+}

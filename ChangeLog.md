@@ -2,6 +2,9 @@
 
 ## 0.13
 
+- NEW: PDF editor, hand like the image editor: Space held over the pages, or middle button, then drag :   0.13.3
+  - no tool used meanwhile (text, drawing, zones...), Space stays a space while a text is typed
+
 - FIX: image editor, the zoom buttons and 1:1 came back to « fit to the window » as soon as the scrollbars appeared :   0.13.2
   - the zoom follows the window only while fitted, a zoom chosen by the user stays (buttons, 1:1, Ctrl + wheel)
   - the point under the mouse (wheel) or the middle of the view (buttons) stays in place
