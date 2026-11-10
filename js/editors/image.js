@@ -178,25 +178,130 @@ window.DocStudio.registerViewer('imageedit', {
 			canvas.requestRenderAll();
 		}
 
+		// Fit to the window: the zoom follows the size of the window until the user chooses another zoom
+		let autoFit = true;
+
 		function fitZoom() {
 			const box = scroller.getBoundingClientRect();
 			const z = Math.min((box.width - 48) / width, (box.height - 48) / height, 1);
 			zoom = Math.max(0.02, z > 0 ? z : 1);
+			autoFit = true;
 			applyZoom();
 		}
 
-		function setZoom(z) {
+		/**
+		 * Zoom chosen by the user, the point under the mouse (or the middle of the view) stays in place
+		 * @param {number} z
+		 * @param {{x: number, y: number}|null} anchor Point of the screen
+		 */
+		function setZoom(z, anchor) {
+			const before = canvas.wrapperEl.getBoundingClientRect();
+			const view = scroller.getBoundingClientRect();
+			const ax = anchor ? anchor.x : view.left + view.width / 2;
+			const ay = anchor ? anchor.y : view.top + view.height / 2;
+			const sx = (ax - before.left) / zoom;
+			const sy = (ay - before.top) / zoom;
 			zoom = Math.min(8, Math.max(0.02, z));
+			autoFit = false;
 			applyZoom();
+			const after = canvas.wrapperEl.getBoundingClientRect();
+			scroller.scrollLeft += after.left + sx * zoom - ax;
+			scroller.scrollTop += after.top + sy * zoom - ay;
 		}
 
 		// Ctrl + wheel zooms the photo only, not the whole page
 		scroller.addEventListener('wheel', function (e) {
 			if (e.ctrlKey || e.metaKey) {
 				e.preventDefault();
-				setZoom(zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1));
+				setZoom(zoom * (e.deltaY < 0 ? 1.1 : 1 / 1.1), { x: e.clientX, y: e.clientY });
 			}
 		}, { passive: false });
+
+		/* Hand: space held (pointer over the image) or middle button, then drag to move the view, like the image editors */
+
+		let spaceDown = false;
+		let overView = false;
+		let panning = null;
+		scroller.addEventListener('pointerenter', function () {
+			overView = true;
+		});
+		scroller.addEventListener('pointerleave', function () {
+			overView = false;
+		});
+		function setPanReady(on) {
+			spaceDown = on;
+			scroller.classList.toggle('ds-pan-ready', on);
+		}
+		function onSpace(e) {
+			if (e.code !== 'Space') {
+				return;
+			}
+			const active = document.activeElement;
+			const typing = active && (active.isContentEditable || ['SELECT', 'TEXTAREA'].includes(active.tagName)
+				|| (active.tagName === 'INPUT' && !['checkbox', 'radio', 'range', 'color', 'button'].includes(active.type)));
+			const editingText = canvas.getActiveObject() && canvas.getActiveObject().isEditing;
+			if (typing || editingText) {
+				return;
+			}
+			if (e.type === 'keydown') {
+				// Only with the pointer over the image: elsewhere Space keeps pressing the focused button
+				if (!overView && !spaceDown) {
+					return;
+				}
+				e.preventDefault();
+				if (!spaceDown) {
+					setPanReady(true);
+				}
+			} else if (spaceDown) {
+				e.preventDefault();
+				setPanReady(false);
+			}
+		}
+		document.addEventListener('keydown', onSpace);
+		document.addEventListener('keyup', onSpace);
+		function onWindowBlur() {
+			setPanReady(false);
+		}
+		window.addEventListener('blur', onWindowBlur);
+		// Before Fabric (capture on its wrapper): the tools do not see a drag of the hand
+		canvas.wrapperEl.addEventListener('pointerdown', function (e) {
+			if (!spaceDown && e.button !== 1) {
+				return;
+			}
+			e.preventDefault();
+			e.stopPropagation();
+			panning = { id: e.pointerId, x: e.clientX, y: e.clientY, left: scroller.scrollLeft, top: scroller.scrollTop };
+			scroller.classList.add('ds-panning');
+			try {
+				canvas.wrapperEl.setPointerCapture(e.pointerId);
+			} catch (err) {
+				// Pointer already gone: the drag ends at the next pointerup
+			}
+		}, true);
+		canvas.wrapperEl.addEventListener('pointermove', function (e) {
+			if (!panning || e.pointerId !== panning.id) {
+				return;
+			}
+			e.stopPropagation();
+			scroller.scrollLeft = panning.left - (e.clientX - panning.x);
+			scroller.scrollTop = panning.top - (e.clientY - panning.y);
+		}, true);
+		function endPan(e) {
+			if (!panning || e.pointerId !== panning.id) {
+				return;
+			}
+			e.stopPropagation();
+			panning = null;
+			scroller.classList.remove('ds-panning');
+		}
+		canvas.wrapperEl.addEventListener('pointerup', endPan, true);
+		canvas.wrapperEl.addEventListener('pointercancel', endPan, true);
+		// Middle button: no automatic scrolling of the browser
+		canvas.wrapperEl.addEventListener('mousedown', function (e) {
+			if (e.button === 1) {
+				e.preventDefault();
+			}
+		}, true);
 
 		/* History */
 
@@ -2664,7 +2769,8 @@ window.DocStudio.registerViewer('imageedit', {
 		selectTool('select');
 		commit();
 		const resizeObserver = new ResizeObserver(function () {
-			if (zoom <= 1) {
+			// Only while fitted: scrollbars appearing after a zoom chosen by the user must not undo it
+			if (autoFit) {
 				fitZoom();
 			}
 		});
@@ -2859,6 +2965,9 @@ window.DocStudio.registerViewer('imageedit', {
 			unmount() {
 				window.removeEventListener('beforeunload', onBeforeUnload);
 				document.removeEventListener('keydown', onKey);
+				document.removeEventListener('keydown', onSpace);
+				document.removeEventListener('keyup', onSpace);
+				window.removeEventListener('blur', onWindowBlur);
 				document.removeEventListener('pointerdown', onDocPointerDown);
 				saveButton.removeEventListener('click', onSaveClick);
 				resizeObserver.disconnect();

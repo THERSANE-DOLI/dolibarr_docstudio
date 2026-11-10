@@ -1515,3 +1515,13 @@ html.ds-theme-fading *::after {
 	width: 18px;
 	height: 18px;
 }
+
+/* Hand of the image editor: space held over the image, or middle button */
+
+.ds-img-scroller.ds-pan-ready canvas {
+	cursor: grab !important;
+}
+
+.ds-img-scroller.ds-panning canvas {
+	cursor: grabbing !important;
+}
