@@ -137,6 +137,17 @@ abstract class DocStudioFileProvider
 	}
 
 	/**
+	 * Address of the reading by the owner of the file when it must trace the reading itself, '' when DocStudio serves
+	 * the content (default)
+	 *
+	 * @return string
+	 */
+	public function getTrackedContentUrl()
+	{
+		return '';
+	}
+
+	/**
 	 * Last change of the content (timestamp), 0 when unknown: version of the file for an office server (WOPI)
 	 *
 	 * @return int

@@ -489,6 +489,12 @@ class DocStudio
 		}
 		$needed = memory_get_usage() + (int) $info[0] * (int) $info[1] * 10 + (int) filesize($file) + 33554432;
 		$limit = self::memoryLimit();
+		// Ceiling of the memory a saving may ask (several savings at once must not saturate the server)
+		$ceiling = getDolGlobalInt('DOCSTUDIO_MAX_MEMORY', 256) * 1048576;
+		if ($needed > max($ceiling, $limit)) {
+			dol_syslog(__METHOD__.' image too big to rewrite ('.$needed.' bytes needed, '.$ceiling.' allowed by DOCSTUDIO_MAX_MEMORY)', LOG_WARNING);
+			return false;
+		}
 		if ($limit > 0 && $limit < $needed && @ini_set('memory_limit', (string) $needed) === false) {
 			dol_syslog(__METHOD__.' not enough memory to rewrite the image ('.$needed.' bytes needed)', LOG_WARNING);
 			return false;

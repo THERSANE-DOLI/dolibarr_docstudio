@@ -283,6 +283,45 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 	}
 
 	/**
+	 * The file is the main document of a validated invoice (its PDF): Dolibarr traces its reading (unalterable log,
+	 * DUPLICATA counter) and it must not be replaced in place
+	 *
+	 * @return bool
+	 */
+	public function isMainDocumentOfValidatedInvoice()
+	{
+		if ($this->fullPath === '' || $this->modulepart !== 'facture' || !(isModEnabled('invoice') || isModEnabled('facture'))) {
+			return false;
+		}
+		$ref = basename(dirname($this->relativeFile));
+		if ($ref === '' || $ref === '.' || $ref === 'thumbs' || $ref === 'temp') {
+			return false;
+		}
+		require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+		$invoice = new Facture($this->db);
+		if ($invoice->fetch(0, $ref) <= 0) {
+			return false;
+		}
+
+		return (int) $invoice->status > Facture::STATUS_DRAFT && $this->relativeFile === preg_replace('/^facture\//', '', (string) $invoice->last_main_doc);
+	}
+
+	/**
+	 * Address of document.php of Dolibarr to read this file when Dolibarr must trace the reading itself (main document
+	 * of a validated invoice: DOC_PREVIEW of the unalterable log, DUPLICATA counter), '' otherwise (audit DSTU-003)
+	 *
+	 * @return string
+	 */
+	public function getTrackedContentUrl()
+	{
+		if (!$this->isMainDocumentOfValidatedInvoice()) {
+			return '';
+		}
+
+		return DOL_URL_ROOT.'/document.php?modulepart=facture&file='.rawurlencode($this->relativeFile).'&entity='.((int) $this->entity).'&preview=1';
+	}
+
+	/**
 	 * Print the raw content of the file
 	 *
 	 * @return bool
@@ -390,12 +429,19 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 
 		$result = array('result' => -1, 'error' => '', 'exists' => 0, 'filename' => '');
 		if (!$this->canWrite($fuser)) {
-			$result['error'] = $langs->trans('DocStudioErrorCannotWrite');
+			$result['error'] = $langs->transnoentitiesnoconv('DocStudioErrorCannotWrite');
+			return $result;
+		}
+		// The main document of a validated invoice is never replaced in place (a copy is saved instead), unless the
+		// hidden setting DOCSTUDIO_ALLOW_REPLACE_VALIDATED allows it (audit DSTU-004)
+		$replacing = $mode === 'replace' || ($overwrite && realpath(dirname($this->fullPath).'/'.$this->cleanCopyName($fileName)) === realpath($this->fullPath));
+		if ($replacing && $this->isMainDocumentOfValidatedInvoice() && !getDolGlobalInt('DOCSTUDIO_ALLOW_REPLACE_VALIDATED')) {
+			$result['error'] = $langs->transnoentitiesnoconv('DocStudioErrorValidatedMainDoc');
 			return $result;
 		}
 		$virus = dolCheckVirus($tmpFile, $this->fullPath);
 		if (count($virus)) {
-			$result['error'] = $langs->trans('DocStudioErrorVirus');
+			$result['error'] = $langs->transnoentitiesnoconv('DocStudioErrorVirus');
 			dol_syslog(__METHOD__.' content refused by the antivirus: '.implode(', ', $virus), LOG_WARNING);
 			return $result;
 		}
@@ -406,7 +452,7 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 		} else {
 			$name = $this->cleanCopyName($fileName);
 			if ($name === '') {
-				$result['error'] = $langs->trans('DocStudioErrorBadFileName');
+				$result['error'] = $langs->transnoentitiesnoconv('DocStudioErrorBadFileName');
 				return $result;
 			}
 			$target = $dir.'/'.$name;
@@ -425,7 +471,7 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 		$work = $dir.'/.docstudio-'.bin2hex(random_bytes(8)).'.tmp';
 		if (!@copy($tmpFile, $work) || !@rename($work, $target)) {
 			@unlink($work);
-			$result['error'] = $langs->trans('DocStudioErrorSave');
+			$result['error'] = $langs->transnoentitiesnoconv('DocStudioErrorSave');
 			return $result;
 		}
 		dolChmod($target);

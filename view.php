@@ -172,7 +172,8 @@ if ($provider !== null && count($viewers)) {
 			'extension' => $provider->getExtension(),
 			'size' => $provider->getSize(),
 		),
-		'contentUrl' => DocStudio::buildUrl('ajax/content.php', $source, $provider->getParams()),
+		// Read by document.php of Dolibarr when it traces the reading itself (validated invoice), else by DocStudio
+		'contentUrl' => $provider->getTrackedContentUrl() !== '' ? $provider->getTrackedContentUrl() : DocStudio::buildUrl('ajax/content.php', $source, $provider->getParams()),
 		'viewers' => $viewerList,
 		'viewerAsked' => $viewerAsked,
 		'viewerDefault' => $defaultViewer,

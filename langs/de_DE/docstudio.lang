@@ -323,3 +323,4 @@ DocStudioWopiAllowedIpsHelp = IP-Adressen des Office-Servers, durch Kommas getre
 DocStudioWopiBadIp = Ungültige IP-Adresse: %s
 DocStudioWopiProofOn = Signatur des Office-Servers geprüft: Jeder Aufruf muss mit seinem Schlüssel signiert sein (WOPI-Proof-Keys).
 DocStudioWopiProofOff = Kein Proof-Key vom Office-Server veröffentlicht: Nur das Token schützt die Aufrufe. Erzeugen Sie einen auf dem Server (Collabora: coolconfig generate-proof-key oder Datei /etc/coolwsd/proof_key).
+DocStudioErrorValidatedMainDoc = Dies ist das Hauptdokument einer freigegebenen Rechnung: Es kann nicht ersetzt werden, speichern Sie eine Kopie.

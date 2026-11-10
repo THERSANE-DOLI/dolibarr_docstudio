@@ -323,3 +323,4 @@ DocStudioWopiAllowedIpsHelp = Adresses IP du serveur bureautique, séparées par
 DocStudioWopiBadIp = Adresse IP invalide : %s
 DocStudioWopiProofOn = Signature du serveur bureautique vérifiée : chaque appel doit être signé par sa clé (clés de preuve WOPI).
 DocStudioWopiProofOff = Pas de clé de preuve publiée par le serveur bureautique : seul le jeton protège les appels. Générez-en une sur le serveur (Collabora : coolconfig generate-proof-key, ou fichier /etc/coolwsd/proof_key).
+DocStudioErrorValidatedMainDoc = C'est le document principal d'une facture validée : il ne peut pas être remplacé, enregistrez une copie.

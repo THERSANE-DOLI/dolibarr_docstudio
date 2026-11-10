@@ -323,3 +323,4 @@ DocStudioWopiAllowedIpsHelp = IP addresses of the office server, separated by co
 DocStudioWopiBadIp = Invalid IP address: %s
 DocStudioWopiProofOn = Signature of the office server checked: every call must be signed by its key (WOPI proof keys).
 DocStudioWopiProofOff = No proof key published by the office server: only the token protects the calls. Generate one on the server (Collabora: coolconfig generate-proof-key, or file /etc/coolwsd/proof_key).
+DocStudioErrorValidatedMainDoc = This is the main document of a validated invoice: it cannot be replaced, save a copy.

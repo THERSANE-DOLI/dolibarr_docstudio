@@ -95,6 +95,16 @@ if (!count($registry->getViewersFor($provider->getExtension(), $provider->getSiz
 }
 
 
+// A reading Dolibarr traces itself (main document of a validated invoice): read through its document.php, which
+// runs its own checks, hooks and logs (same origin, followed by the fetch of the viewer)
+$tracked = $provider->getTrackedContentUrl();
+if ($tracked !== '') {
+	header('Cache-Control: private, no-store');
+	header('Location: '.$tracked, true, 303);
+	$db->close();
+	exit;
+}
+
 // Modules refusing or logging the downloads (hook downloadDocument of document.php)
 if (!$provider->runDownloadHooks($user)) {
 	httponly_accessforbidden(dol_escape_htmltag($provider->error !== '' ? $provider->error : $langs->trans('DocStudioErrorForbidden')), 403, 1);

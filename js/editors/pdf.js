@@ -1913,6 +1913,10 @@ window.DocStudio.registerViewer('pdfedit', {
 		nameInput.maxLength = 200;
 		nameLabel.appendChild(nameInput);
 		const replaceLabel = document.createElement('label');
+		// Main document of a validated invoice: a copy only, the reason in the tooltip
+		if (ctx.config.canReplace === false) {
+			replaceLabel.title = t('DocStudioErrorValidatedMainDoc');
+		}
 		replaceLabel.className = 'ds-choice';
 		const replaceRadio = document.createElement('input');
 		replaceRadio.type = 'radio';
@@ -1989,7 +1993,7 @@ window.DocStudio.registerViewer('pdfedit', {
 			if (split) {
 				copyRadio.checked = true;
 			}
-			replaceRadio.disabled = split;
+			replaceRadio.disabled = split || ctx.config.canReplace === false;
 			nameInput.disabled = !copyRadio.checked;
 			replaceWarning.hidden = !replaceRadio.checked;
 			splitInfo.hidden = !split;

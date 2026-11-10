@@ -62,7 +62,8 @@ $object->loadPersonalConf();
 
 // The user himself, or an administrator
 $canedit = ($user->id == $object->id || $user->admin);
-if (!isModEnabled('docstudio') || !$canedit || ($object->entity != $conf->entity && !empty($object->entity) && !$user->admin)) {
+// A user of another entity: only a superadmin (an administrator of an entity stays in his entity)
+if (!isModEnabled('docstudio') || !$canedit || ($object->entity != $conf->entity && !empty($object->entity) && !(empty($user->entity) && $user->admin))) {
 	accessforbidden();
 }
 

@@ -323,3 +323,4 @@ DocStudioWopiAllowedIpsHelp = Direcciones IP del servidor ofimático, separadas 
 DocStudioWopiBadIp = Dirección IP no válida: %s
 DocStudioWopiProofOn = Firma del servidor ofimático comprobada: cada llamada debe estar firmada por su clave (claves de prueba WOPI).
 DocStudioWopiProofOff = El servidor ofimático no publica clave de prueba: solo el token protege las llamadas. Genere una en el servidor (Collabora: coolconfig generate-proof-key, o archivo /etc/coolwsd/proof_key).
+DocStudioErrorValidatedMainDoc = Es el documento principal de una factura validada: no se puede sustituir, guarde una copia.

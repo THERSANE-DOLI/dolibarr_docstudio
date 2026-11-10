@@ -323,3 +323,4 @@ DocStudioWopiAllowedIpsHelp = Indirizzi IP del server Office, separati da virgol
 DocStudioWopiBadIp = Indirizzo IP non valido: %s
 DocStudioWopiProofOn = Firma del server Office verificata: ogni chiamata deve essere firmata dalla sua chiave (chiavi di prova WOPI).
 DocStudioWopiProofOff = Nessuna chiave di prova pubblicata dal server Office: solo il token protegge le chiamate. Generane una sul server (Collabora: coolconfig generate-proof-key, o file /etc/coolwsd/proof_key).
+DocStudioErrorValidatedMainDoc = È il documento principale di una fattura convalidata: non può essere sostituito, salva una copia.

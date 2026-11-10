@@ -2,6 +2,16 @@
 
 ## 0.17
 
+- FIX: security audit of 0.10.2, points left (DSTU-003, 004, 005, 006, 009) :   0.17.1
+  - main document of a validated invoice read through document.php of Dolibarr: its unalterable log (DOC_PREVIEW)
+    and its DUPLICATA counter work as with the preview of Dolibarr
+  - this document is never replaced in place by the editors (a copy instead, the choice greyed with the reason),
+    hidden setting DOCSTUDIO_ALLOW_REPLACE_VALIDATED to allow it
+  - saving of an image: memory asked limited by DOCSTUDIO_MAX_MEMORY (256 MB by default), refused beyond
+  - fonts uploaded in the setup checked by the antivirus
+  - preferences of a user of another entity changed by a superadmin only
+  - messages of the saving shown without HTML entities
+
 - NEW: office server, signature of its calls checked (WOPI proof keys) and addresses allowed :   0.17.0
   - when the discovery gives a public key, every call of wopi.php must be signed by the office server (token,
     address, time of less than 20 minutes; current and old key): a token alone is no longer enough

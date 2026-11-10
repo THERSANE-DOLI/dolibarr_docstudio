@@ -2845,6 +2845,10 @@ window.DocStudio.registerViewer('imageedit', {
 		nameInput.maxLength = 200;
 		nameLabel.appendChild(nameInput);
 		const replaceLabel = document.createElement('label');
+		// Main document of a validated invoice: a copy only, the reason in the tooltip
+		if (ctx.config.canReplace === false) {
+			replaceLabel.title = t('DocStudioErrorValidatedMainDoc');
+		}
 		replaceLabel.className = 'ds-choice';
 		const replaceRadio = document.createElement('input');
 		replaceRadio.type = 'radio';
@@ -2888,6 +2892,7 @@ window.DocStudio.registerViewer('imageedit', {
 		function syncDialog() {
 			nameInput.disabled = !copyRadio.checked;
 			replaceWarning.hidden = !replaceRadio.checked;
+			replaceRadio.disabled = ctx.config.canReplace === false;
 			if (replaceRadio.checked) {
 				overwriteLabel.hidden = true;
 			}

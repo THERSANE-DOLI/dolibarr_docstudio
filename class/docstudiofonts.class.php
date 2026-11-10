@@ -187,6 +187,13 @@ class DocStudioFonts
 				self::$error = $langs->transnoentitiesnoconv('DocStudioFontErrorFile', (string) ($upload['name'] ?? ''), self::MAX_UPLOAD / 1048576);
 				return '';
 			}
+			// Read by fontkit and by the browsers of every user of the editors: the antivirus first
+			$virus = dolCheckVirus($tmp, (string) ($upload['name'] ?? ''));
+			if (count($virus)) {
+				self::$error = $langs->transnoentitiesnoconv('DocStudioErrorVirus');
+				dol_syslog(__METHOD__.' font refused by the antivirus: '.implode(', ', $virus), LOG_WARNING);
+				return '';
+			}
 			$faces[$weight] = array('file' => $weight.'.'.$ext, 'tmp' => $tmp);
 		}
 
