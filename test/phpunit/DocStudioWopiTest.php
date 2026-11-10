@@ -77,6 +77,66 @@ class DocStudioWopiTest extends TestCase
 		$this->assertSame('http://office.test/browser/cool.html?', $actions['docx']['edit']);
 		$this->assertArrayNotHasKey('js', $actions, 'Only http(s) addresses');
 		$this->assertSame(array(), DocStudioWopi::parseDiscovery('not xml'));
+		$withKey = '<wopi-discovery><proof-key value="x" modulus="'.str_repeat('A', 120).'" exponent="AQAB" oldmodulus="'.str_repeat('B', 120).'" oldexponent="AQAB"/></wopi-discovery>';
+		$this->assertCount(2, DocStudioWopi::parseProofKeys($withKey), 'Current and old keys');
+		$this->assertSame(array(), DocStudioWopi::parseProofKeys('<wopi-discovery/>'));
+	}
+
+	/**
+	 * Signature of the office server: a real RSA key, given like the discovery gives it (modulus and exponent)
+	 *
+	 * @return void
+	 */
+	public function testProof()
+	{
+		if (!function_exists('openssl_pkey_new')) {
+			$this->markTestSkipped('openssl missing');
+		}
+		$res = openssl_pkey_new(array('private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA));
+		$details = openssl_pkey_get_details($res);
+		$keys = array(array('modulus' => base64_encode($details['rsa']['n']), 'exponent' => base64_encode($details['rsa']['e'])));
+		$this->assertSame($details['key'], DocStudioWopi::publicKeyPem($keys[0]['modulus'], $keys[0]['exponent']), 'Same public key as openssl');
+
+		$token = 'abc.def';
+		$url = 'http://localhost/custom/docstudio/wopi.php/files/0123?access_token=abc.def';
+		$ticks = (string) (dol_now() * 10000000 + 621355968000000000);
+		$sign = function ($t, $u, $ts) use ($res) {
+			$u = strtoupper($u);
+			$data = pack('N', strlen($t)).$t.pack('N', strlen($u)).$u.pack('N', 8).pack('J', (int) $ts);
+			openssl_sign($data, $sig, $res, OPENSSL_ALGO_SHA256);
+			return base64_encode($sig);
+		};
+		$proof = $sign($token, $url, $ticks);
+		$this->assertTrue(DocStudioWopi::checkProof($keys, $token, array($url), $ticks, $proof, ''));
+		$this->assertTrue(DocStudioWopi::checkProof($keys, $token, array('http://other/', $url), $ticks, $proof, ''), 'One of the addresses');
+		$this->assertTrue(DocStudioWopi::checkProof($keys, $token, array($url), $ticks, 'AAAA', $proof), 'Old proof');
+		$this->assertFalse(DocStudioWopi::checkProof($keys, 'other', array($url), $ticks, $proof, ''), 'Other token');
+		$this->assertFalse(DocStudioWopi::checkProof($keys, $token, array($url.'&x=1'), $ticks, $proof, ''), 'Other address');
+		$old = (string) ((dol_now() - 3600) * 10000000 + 621355968000000000);
+		$this->assertFalse(DocStudioWopi::checkProof($keys, $token, array($url), $old, $sign($token, $url, $old), ''), 'Too old');
+		$other = openssl_pkey_get_details(openssl_pkey_new(array('private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA)));
+		$this->assertFalse(DocStudioWopi::checkProof(array(array('modulus' => base64_encode($other['rsa']['n']), 'exponent' => base64_encode($other['rsa']['e']))), $token, array($url), $ticks, $proof, ''), 'Other key');
+		$this->assertFalse(DocStudioWopi::checkProof(array(), $token, array($url), $ticks, $proof, ''), 'No key');
+	}
+
+	/**
+	 * Addresses allowed to call wopi.php
+	 *
+	 * @return void
+	 */
+	public function testAllowedIp()
+	{
+		global $conf;
+		$saved = isset($conf->global->DOCSTUDIO_WOPI_ALLOWED_IPS) ? $conf->global->DOCSTUDIO_WOPI_ALLOWED_IPS : null;
+		$conf->global->DOCSTUDIO_WOPI_ALLOWED_IPS = '';
+		$this->assertTrue(DocStudioWopi::isAllowedIp('203.0.113.9'), 'Empty: every address');
+		$conf->global->DOCSTUDIO_WOPI_ALLOWED_IPS = '127.0.0.1, 10.0.0.0/8 ::1';
+		$this->assertTrue(DocStudioWopi::isAllowedIp('127.0.0.1'));
+		$this->assertTrue(DocStudioWopi::isAllowedIp('10.20.30.40'));
+		$this->assertTrue(DocStudioWopi::isAllowedIp('::1'));
+		$this->assertFalse(DocStudioWopi::isAllowedIp('11.0.0.1'));
+		$this->assertFalse(DocStudioWopi::isAllowedIp(''));
+		$conf->global->DOCSTUDIO_WOPI_ALLOWED_IPS = $saved;
 	}
 
 	/**

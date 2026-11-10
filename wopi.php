@@ -28,6 +28,8 @@
  * Every call: the signed token gives the user, the entity, the file and the mode; the user must still be active and
  * the file is loaded again by its provider with the rights of this user (same checks as the pages of DocStudio).
  * Saving: write permission checked again, ZIP package of the type of the file, size, antivirus, hook docstudioBeforeSave.
+ * Caller: address in DOCSTUDIO_WOPI_ALLOWED_IPS when set; signature of the office server (WOPI proof keys) when its
+ * discovery gives a public key (DOCSTUDIO_WOPI_PROOF_OFF, hidden: only logged, for a troubleshooting).
  */
 
 if (!defined('NOLOGIN')) {
@@ -136,7 +138,45 @@ $fileId = $m[1];
 $contents = !empty($m[2]);
 $method = $_SERVER['REQUEST_METHOD'];
 
+// Address of the caller (the office server), without trusting the headers of proxies
+$remote = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+if (!DocStudioWopi::isAllowedIp($remote)) {
+	dol_syslog('docstudio/wopi.php refused: address '.$remote.' not allowed', LOG_WARNING);
+	docstudioWopiAnswer(403);
+}
+
 $token = isset($_GET['access_token']) ? (string) $_GET['access_token'] : '';
+
+// Signature of the office server: the call comes from it, not from someone holding a token
+$wopiTools = new DocStudioWopi();
+$proofKeys = $wopiTools->getProofKeys();
+if (count($proofKeys)) {
+	$host = isset($_SERVER['HTTP_HOST']) ? (string) $_SERVER['HTTP_HOST'] : '';
+	$uri = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
+	$https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['REQUEST_SCHEME']) && $_SERVER['REQUEST_SCHEME'] === 'https');
+	$urls = array(($https ? 'https' : 'http').'://'.$host.$uri);
+	// Behind a proxy, the address given in the setup (the one the office server calls)
+	$hostUrl = DocStudioWopi::getHostUrl();
+	if (preg_match('#^(https?://[^/]+)#i', $hostUrl, $mh) && strpos($uri, '/wopi.php') !== false) {
+		$urls[] = $hostUrl.substr($uri, strpos($uri, '/wopi.php') + strlen('/wopi.php'));
+		$urls[] = $mh[1].$uri;
+	}
+	$valid = DocStudioWopi::checkProof(
+		$proofKeys,
+		$token,
+		array_unique($urls),
+		isset($_SERVER['HTTP_X_WOPI_TIMESTAMP']) ? (string) $_SERVER['HTTP_X_WOPI_TIMESTAMP'] : '',
+		isset($_SERVER['HTTP_X_WOPI_PROOF']) ? (string) $_SERVER['HTTP_X_WOPI_PROOF'] : '',
+		isset($_SERVER['HTTP_X_WOPI_PROOFOLD']) ? (string) $_SERVER['HTTP_X_WOPI_PROOFOLD'] : ''
+	);
+	if (!$valid) {
+		dol_syslog('docstudio/wopi.php call without a valid signature of the office server from '.$remote, LOG_WARNING);
+		if (!getDolGlobalInt('DOCSTUDIO_WOPI_PROOF_OFF')) {
+			docstudioWopiAnswer(401);
+		}
+	}
+}
+
 $data = DocStudioWopi::checkToken($token, $fileId);
 if ($data === null || (int) $data['e'] !== (int) $conf->entity) {
 	docstudioWopiAnswer(401);

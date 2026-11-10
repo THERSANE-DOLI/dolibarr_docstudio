@@ -1,5 +1,14 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.17
+
+- NEW: office server, signature of its calls checked (WOPI proof keys) and addresses allowed :   0.17.0
+  - when the discovery gives a public key, every call of wopi.php must be signed by the office server (token,
+    address, time of less than 20 minutes; current and old key): a token alone is no longer enough
+  - setup: addresses allowed to call Dolibarr (IPv4, IPv6, IPv4 ranges), empty for any; the Test button says whether
+    the office server signs its calls and how to give it a key (Collabora: coolconfig generate-proof-key)
+  - hidden setting DOCSTUDIO_WOPI_PROOF_OFF for a troubleshooting (signature only logged)
+
 ## 0.16
 
 - FIX: viewer in the window of inbox, name of the file, download and opening in a tab shown twice :   0.16.1

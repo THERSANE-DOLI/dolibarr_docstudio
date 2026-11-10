@@ -25,6 +25,8 @@
  *   instance), limited in time. The office server sends the token back on every call of wopi.php; the file is loaded
  *   again with the rights of the user at each call, the token only says who and what.
  * - Locks of WOPI, kept in files of the work directory (30 minutes, refreshed by the office server).
+ * - Proof keys of WOPI: when the discovery gives a public key, every call must be signed by the office server
+ *   (X-WOPI-Proof over the token, the address and the time); optional list of the addresses allowed to call.
  */
 
 /**
@@ -40,6 +42,9 @@ class DocStudioWopi
 
 	/** Life of the discovery cached, in seconds */
 	const DISCOVERY_TTL = 3600;
+
+	/** Biggest gap between the time of a signed call and now, in seconds (WOPI: 20 minutes) */
+	const PROOF_MAX_AGE = 1200;
 
 	/** Types opened when the discovery cannot be read (most office servers open them) */
 	const DEFAULT_EXTENSIONS = array('docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'doc', 'xls', 'ppt', 'rtf');
@@ -130,27 +135,54 @@ class DocStudioWopi
 			$this->error = 'Not set';
 			return array();
 		}
+		$data = $this->loadDiscovery($refresh);
+
+		return $data['actions'];
+	}
+
+	/**
+	 * Discovery cached or read again: array('actions' => ..., 'proof' => list of public keys)
+	 *
+	 * @param bool $refresh
+	 * @return array{actions:array<string,array<string,string>>,proof:array<int,array{modulus:string,exponent:string}>}
+	 */
+	protected function loadDiscovery($refresh)
+	{
+		$empty = array('actions' => array(), 'proof' => array());
 		$cache = self::cacheFile();
 		if (!$refresh && is_readable($cache) && filemtime($cache) > dol_now() - self::DISCOVERY_TTL) {
 			$data = json_decode((string) file_get_contents($cache), true);
-			if (is_array($data)) {
-				return $data;
+			if (is_array($data) && isset($data['actions'])) {
+				return $data + $empty;
 			}
 		}
 		$xml = $this->httpGet(self::getServerUrl().'/hosting/discovery');
 		if ($xml === '') {
-			return array();
+			return $empty;
 		}
-		$actions = self::parseDiscovery($xml);
-		if (!count($actions)) {
+		$data = array('actions' => self::parseDiscovery($xml), 'proof' => self::parseProofKeys($xml));
+		if (!count($data['actions'])) {
 			$this->error = 'Discovery without actions';
-			return array();
+			return $empty;
 		}
 		if (dol_mkdir(dirname($cache)) >= 0) {
-			@file_put_contents($cache, json_encode($actions));
+			@file_put_contents($cache, json_encode($data));
 		}
 
-		return $actions;
+		return $data;
+	}
+
+	/**
+	 * Public keys of the office server (current, then old one during a change of key)
+	 *
+	 * @param bool $refresh
+	 * @return array<int,array{modulus:string,exponent:string}>
+	 */
+	public function getProofKeys($refresh = false)
+	{
+		$data = $this->loadDiscovery($refresh);
+
+		return $data['proof'];
 	}
 
 	/**
@@ -183,6 +215,138 @@ class DocStudioWopi
 	}
 
 	/**
+	 * @param string $xml Content of /hosting/discovery
+	 * @return array<int,array{modulus:string,exponent:string}>
+	 */
+	public static function parseProofKeys($xml)
+	{
+		$previous = libxml_use_internal_errors(true);
+		$doc = simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NONET | LIBXML_NOCDATA);
+		libxml_use_internal_errors($previous);
+		$keys = array();
+		if ($doc === false) {
+			return $keys;
+		}
+		foreach ($doc->xpath('//proof-key') ?: array() as $key) {
+			foreach (array('', 'old') as $prefix) {
+				$modulus = (string) $key[$prefix.'modulus'];
+				$exponent = (string) $key[$prefix.'exponent'];
+				if (preg_match('/^[A-Za-z0-9+\/=]{100,}$/', $modulus) && preg_match('/^[A-Za-z0-9+\/=]{2,16}$/', $exponent)) {
+					$keys[] = array('modulus' => $modulus, 'exponent' => $exponent);
+				}
+			}
+		}
+
+		return $keys;
+	}
+
+	/**
+	 * Public key in PEM from the modulus and the exponent of the discovery (base64, big endian)
+	 *
+	 * @param string $modulus
+	 * @param string $exponent
+	 * @return string
+	 */
+	public static function publicKeyPem($modulus, $exponent)
+	{
+		$der = function ($tag, $bytes) {
+			$len = strlen($bytes);
+			if ($len < 0x80) {
+				$size = chr($len);
+			} else {
+				$hex = ltrim(pack('N', $len), "\0");
+				$size = chr(0x80 | strlen($hex)).$hex;
+			}
+			return chr($tag).$size.$bytes;
+		};
+		$int = function ($bytes) use ($der) {
+			$bytes = ltrim($bytes, "\0");
+			// Positive integer: a leading zero when the first bit is set
+			if ($bytes === '' || (ord($bytes[0]) & 0x80)) {
+				$bytes = "\0".$bytes;
+			}
+			return $der(0x02, $bytes);
+		};
+		$rsa = $der(0x30, $int((string) base64_decode($modulus)).$int((string) base64_decode($exponent)));
+		// AlgorithmIdentifier rsaEncryption + NULL
+		$algo = $der(0x30, $der(0x06, "\x2A\x86\x48\x86\xF7\x0D\x01\x01\x01").$der(0x05, ''));
+		$spki = $der(0x30, $algo.$der(0x03, "\0".$rsa));
+
+		return "-----BEGIN PUBLIC KEY-----\n".chunk_split(base64_encode($spki), 64, "\n")."-----END PUBLIC KEY-----\n";
+	}
+
+	/**
+	 * Signature of a call of the office server (WOPI proof): token, address in upper case and time, signed with
+	 * RSA-SHA256 by the current or the old key of the discovery
+	 *
+	 * @param array<int,array{modulus:string,exponent:string}> $keys
+	 * @param string   $token     Access token of the call
+	 * @param string[] $urls      Addresses of the call (as the office server may have written it)
+	 * @param string   $timestamp X-WOPI-TimeStamp (ticks of .NET, UTC)
+	 * @param string   $proof     X-WOPI-Proof
+	 * @param string   $proofOld  X-WOPI-ProofOld
+	 * @return bool
+	 */
+	public static function checkProof(array $keys, $token, array $urls, $timestamp, $proof, $proofOld)
+	{
+		if (!count($keys) || !preg_match('/^\d{15,20}$/', $timestamp) || $proof === '' || !function_exists('openssl_verify')) {
+			return false;
+		}
+		// Ticks: 100 ns since 0001-01-01
+		$unix = (int) floor(((float) $timestamp - 621355968000000000) / 10000000);
+		if (abs(dol_now() - $unix) > self::PROOF_MAX_AGE) {
+			return false;
+		}
+		$ticks = pack('J', (int) $timestamp);
+		$signatures = array_filter(array(base64_decode($proof, true), $proofOld !== '' ? base64_decode($proofOld, true) : false));
+		foreach ($urls as $url) {
+			$url = strtoupper($url);
+			$data = pack('N', strlen($token)).$token.pack('N', strlen($url)).$url.pack('N', 8).$ticks;
+			foreach ($keys as $key) {
+				$pem = self::publicKeyPem($key['modulus'], $key['exponent']);
+				foreach ($signatures as $signature) {
+					if (openssl_verify($data, $signature, $pem, OPENSSL_ALGO_SHA256) === 1) {
+						return true;
+					}
+				}
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * The address of the caller is allowed (setting DOCSTUDIO_WOPI_ALLOWED_IPS: addresses or IPv4 ranges a.b.c.d/n,
+	 * separated by commas or spaces; empty: every address)
+	 *
+	 * @param string $ip REMOTE_ADDR
+	 * @return bool
+	 */
+	public static function isAllowedIp($ip)
+	{
+		$list = preg_split('/[\s,;]+/', trim(getDolGlobalString('DOCSTUDIO_WOPI_ALLOWED_IPS')), -1, PREG_SPLIT_NO_EMPTY);
+		if (!$list) {
+			return true;
+		}
+		foreach ($list as $allowed) {
+			if (strpos($allowed, '/') !== false) {
+				list($net, $bits) = explode('/', $allowed, 2);
+				$bits = (int) $bits;
+				if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) && filter_var($net, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) && $bits >= 0 && $bits <= 32) {
+					$mask = $bits === 0 ? 0 : (~0 << (32 - $bits)) & 0xFFFFFFFF;
+					if ((ip2long($ip) & $mask) === (ip2long($net) & $mask)) {
+						return true;
+					}
+				}
+			} elseif (@inet_pton($allowed) !== false && @inet_pton($allowed) === @inet_pton($ip)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
 	 * Extensions opened for an action, from the cached discovery only (no call to the network on every page)
 	 *
 	 * @param string $action 'view' or 'edit'
@@ -192,6 +356,7 @@ class DocStudioWopi
 	{
 		$cache = self::cacheFile();
 		$data = is_readable($cache) ? json_decode((string) file_get_contents($cache), true) : null;
+		$data = is_array($data) && isset($data['actions']) ? $data['actions'] : null;
 		if (!is_array($data)) {
 			$list = self::DEFAULT_EXTENSIONS;
 		} else {

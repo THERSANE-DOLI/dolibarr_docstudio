@@ -123,9 +123,21 @@ if ($action == 'updatetools') {
 if ($action == 'updatewopi') {
 	$url = trim(GETPOST('DOCSTUDIO_WOPI_URL', 'alphanohtml'));
 	$hostUrl = trim(GETPOST('DOCSTUDIO_WOPI_HOST_URL', 'alphanohtml'));
+	$ips = trim(GETPOST('DOCSTUDIO_WOPI_ALLOWED_IPS', 'alphanohtml'));
+	$badIp = '';
+	foreach (preg_split('/[\s,;]+/', $ips, -1, PREG_SPLIT_NO_EMPTY) as $ip) {
+		$base = strpos($ip, '/') !== false ? substr($ip, 0, strpos($ip, '/')) : $ip;
+		if (!filter_var($base, FILTER_VALIDATE_IP) || (strpos($ip, '/') !== false && (!filter_var($base, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) || !preg_match('#/(\d|[12]\d|3[0-2])$#', $ip)))) {
+			$badIp = $ip;
+			break;
+		}
+	}
 	if (($url !== '' && !preg_match('/^https?:\/\/[^\s]+$/i', $url)) || ($hostUrl !== '' && !preg_match('/^https?:\/\/[^\s]+$/i', $hostUrl))) {
 		setEventMessages($langs->trans('DocStudioWopiBadUrl'), null, 'errors');
+	} elseif ($badIp !== '') {
+		setEventMessages($langs->trans('DocStudioWopiBadIp', $badIp), null, 'errors');
 	} else {
+		dolibarr_set_const($db, 'DOCSTUDIO_WOPI_ALLOWED_IPS', $ips, 'chaine', 0, '', $conf->entity);
 		dolibarr_set_const($db, 'DOCSTUDIO_WOPI_URL', $url, 'chaine', 0, '', $conf->entity);
 		dolibarr_set_const($db, 'DOCSTUDIO_WOPI_HOST_URL', $hostUrl, 'chaine', 0, '', $conf->entity);
 		if ($url !== '') {
@@ -147,6 +159,8 @@ if ($action == 'testwopi' && DocStudioWopi::isEnabled()) {
 	if (count($discovery)) {
 		$version = $wopi->getServerVersion();
 		$testResults['wopi'] = array(true, $langs->transnoentitiesnoconv('DocStudioWopiOk', $version !== '' ? $version : '?', implode(', ', DocStudioWopi::getExtensions('edit')), count(DocStudioWopi::getExtensions('view'))));
+		// Signature of the calls (proof keys): said, with what to do when the office server has none
+		$testResults['wopiproof'] = count($wopi->getProofKeys()) ? array(true, $langs->transnoentitiesnoconv('DocStudioWopiProofOn')) : array(false, $langs->transnoentitiesnoconv('DocStudioWopiProofOff'));
 	} else {
 		$testResults['wopi'] = array(false, $langs->transnoentitiesnoconv('DocStudioWopiKo', $wopi->error));
 	}
@@ -241,7 +255,7 @@ if (DocStudioPdfTools::canCompress()) {
 print '</div>';
 print '</form>';
 foreach ($testResults as $key => $res) {
-	if ($key === 'wopi') {
+	if ($key === 'wopi' || $key === 'wopiproof') {
 		continue;
 	}
 	print '<div class="'.($res[0] ? 'ok' : 'error').' margintoponly">'.img_picto('', $res[0] ? 'tick' : 'error', 'class="pictofixedwidth"').dol_escape_htmltag($res[1]).'</div>';
@@ -260,6 +274,8 @@ print '<tr class="oddeven"><td><label for="DOCSTUDIO_WOPI_URL">'.$langs->trans('
 print '<td><input type="url" class="minwidth300" id="DOCSTUDIO_WOPI_URL" name="DOCSTUDIO_WOPI_URL" value="'.dol_escape_htmltag(getDolGlobalString('DOCSTUDIO_WOPI_URL')).'" placeholder="https://office.example.com" autocomplete="off" spellcheck="false"></td></tr>';
 print '<tr class="oddeven"><td><label for="DOCSTUDIO_WOPI_HOST_URL">'.$langs->trans('DocStudioWopiHostUrl').'</label><br><span class="opacitymedium small">'.$langs->trans('DocStudioWopiHostUrlHelp', dol_escape_htmltag(DocStudioWopi::getHostUrl())).'</span></td>';
 print '<td><input type="url" class="minwidth300" id="DOCSTUDIO_WOPI_HOST_URL" name="DOCSTUDIO_WOPI_HOST_URL" value="'.dol_escape_htmltag(getDolGlobalString('DOCSTUDIO_WOPI_HOST_URL')).'" placeholder="'.dol_escape_htmltag(DOL_MAIN_URL_ROOT).'" autocomplete="off" spellcheck="false"></td></tr>';
+print '<tr class="oddeven"><td><label for="DOCSTUDIO_WOPI_ALLOWED_IPS">'.$langs->trans('DocStudioWopiAllowedIps').'</label><br><span class="opacitymedium small">'.$langs->trans('DocStudioWopiAllowedIpsHelp').'</span></td>';
+print '<td><input type="text" class="minwidth300" id="DOCSTUDIO_WOPI_ALLOWED_IPS" name="DOCSTUDIO_WOPI_ALLOWED_IPS" value="'.dol_escape_htmltag(getDolGlobalString('DOCSTUDIO_WOPI_ALLOWED_IPS')).'" placeholder="203.0.113.10, 10.0.0.0/8" autocomplete="off" spellcheck="false"></td></tr>';
 print '</table>';
 print '</div>';
 print '<div class="center"><input type="submit" class="button button-save" value="'.dol_escape_htmltag($langs->trans('Save')).'">';
@@ -268,10 +284,14 @@ if (DocStudioWopi::isEnabled()) {
 }
 print '</div>';
 print '</form>';
-if (isset($testResults['wopi'])) {
-	$res = $testResults['wopi'];
-	print '<div class="'.($res[0] ? 'ok' : 'error').' margintoponly">'.img_picto('', $res[0] ? 'tick' : 'error', 'class="pictofixedwidth"').dol_escape_htmltag($res[1]).'</div>';
-	unset($testResults['wopi']);
+foreach (array('wopi', 'wopiproof') as $key) {
+	if (isset($testResults[$key])) {
+		$res = $testResults[$key];
+		// No proof key: a warning, the office server still works with the tokens
+		$warn = $key === 'wopiproof' && !$res[0];
+		print '<div class="'.($res[0] ? 'ok' : ($warn ? 'warning' : 'error')).' margintoponly">'.img_picto('', $res[0] ? 'tick' : ($warn ? 'warning' : 'error'), 'class="pictofixedwidth"').dol_escape_htmltag($res[1]).'</div>';
+		unset($testResults[$key]);
+	}
 }
 
 // What redaction really does, written where the tools are chosen (analysis 5.1)
