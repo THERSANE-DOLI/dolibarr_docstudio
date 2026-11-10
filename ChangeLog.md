@@ -2,6 +2,8 @@
 
 ## 0.12
 
+- FIX: editors, name of the tool higher than the name of the file in the top bar when the tool has no option :   0.12.1
+
 - NEW: image editor, layers panel :   0.12.0
   - panel on the right with the elements over the photo, the top one first, the photo always at the bottom
   - show or hide, lock (no longer selectable), rename (double click or F2), order by drag and drop or with

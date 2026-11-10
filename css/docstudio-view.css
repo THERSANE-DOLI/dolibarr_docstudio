@@ -1207,6 +1207,8 @@ body {
 
 .docstudio-editor-page .docstudio-tools {
 	min-width: 0;
+	/* Height of a button: a line with text only (tool name) stays centered on the file name */
+	min-height: 30px;
 }
 
 .docstudio-editor-page #docstudio-save {
