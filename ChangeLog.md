@@ -2,6 +2,9 @@
 
 ## 0.10
 
+- FIX: superadmin refused on the documents of another entity (multicompany), reason of a refusal in the log :   0.10.1
+  - the reason (entity, permission, thirdparty, dataroot) is also added to the message for administrators
+
 - NEW: image editor for PNG, JPEG and WebP (lot 2b, cutout in a next version) :   0.10.0
   - same layout as the PDF editor: palette of tools on the left, options of the tool on top, shortcuts, pencil
     « Edit with DocStudio » on the images of the lists of documents (file associations: Editing)

@@ -85,20 +85,17 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 			$this->error = $langs->trans('DocStudioErrorBadFileName');
 			return -1;
 		}
-		if (!$this->isEntityAllowed($this->entity)) {
-			$this->error = $langs->trans('DocStudioErrorForbidden');
-			return -1;
+		if (!$this->isEntityAllowed($this->entity, $fuser)) {
+			return $this->refuse('entity', $fuser);
 		}
 
 		$check = dol_check_secure_access_document($this->modulepart, $this->relativeFile, $this->entity, $fuser, '', 'read');
 		if (!is_array($check) || empty($check['accessallowed']) || empty($check['original_file'])) {
-			$this->error = $langs->trans('DocStudioErrorForbidden');
-			return -1;
+			return $this->refuse('permission', $fuser);
 		}
 
 		if (!empty($fuser->socid) && !$this->isOwnThirdpartyDocument($fuser, isset($check['sqlprotectagainstexternals']) ? (string) $check['sqlprotectagainstexternals'] : '')) {
-			$this->error = $langs->trans('DocStudioErrorForbidden');
-			return -1;
+			return $this->refuse('thirdparty', $fuser);
 		}
 
 		$path = (string) $check['original_file'];
@@ -107,14 +104,33 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 			return 0;
 		}
 		if (!self::isInsideDataRoot($path)) {
-			dol_syslog(__METHOD__.' refused file outside of the data directory: '.$path, LOG_WARNING);
-			$this->error = $langs->trans('DocStudioErrorForbidden');
-			return -1;
+			dol_syslog(__METHOD__.' real path '.((string) realpath($path)).' is not inside '.((string) realpath(DOL_DATA_ROOT)), LOG_WARNING);
+			return $this->refuse('dataroot', $fuser);
 		}
 
 		$this->fullPath = $path;
 
 		return 1;
+	}
+
+	/**
+	 * Refuse the file: the reason is logged, and shown to administrators only (support without access to the logs)
+	 *
+	 * @param string $reason Code of the check that failed: entity, permission, thirdparty or dataroot
+	 * @param User   $fuser  User asking for the file
+	 * @return int           -1
+	 */
+	protected function refuse($reason, User $fuser)
+	{
+		global $langs;
+
+		dol_syslog(__METHOD__.' refused ('.$reason.') modulepart='.$this->modulepart.' file='.$this->relativeFile.' entity='.$this->entity.' user='.$fuser->id, LOG_WARNING);
+		$this->error = $langs->trans('DocStudioErrorForbidden');
+		if (!empty($fuser->admin)) {
+			$this->error .= ' ('.$reason.')';
+		}
+
+		return -1;
 	}
 
 	/**
@@ -189,12 +205,14 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 	}
 
 	/**
-	 * The entity of the document is the current one, or one shared with it
+	 * The entity of the document is the current one, or one shared with it. A superadmin (administrator of entity 0)
+	 * may see the documents of every entity, like with document.php.
 	 *
-	 * @param int $entity Entity asked
+	 * @param int  $entity Entity asked
+	 * @param User $fuser  User asking for the file
 	 * @return bool
 	 */
-	protected function isEntityAllowed($entity)
+	protected function isEntityAllowed($entity, User $fuser)
 	{
 		global $conf;
 
@@ -203,6 +221,9 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 		}
 		if (!isModEnabled('multicompany')) {
 			return false;
+		}
+		if (!empty($fuser->admin) && empty($fuser->entity)) {
+			return true;
 		}
 		$allowed = array_map('intval', explode(',', getEntity($this->modulepart)));
 
