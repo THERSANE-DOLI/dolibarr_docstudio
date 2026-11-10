@@ -163,6 +163,8 @@ if ($provider === null) {
 	print '<div class="docstudio-message" id="docstudio-loading">'.dol_escape_htmltag($langs->trans('DocStudioLoading')).'</div>';
 }
 print '</main>'."\n";
+// Status bar: zoom, contextual help and information of the editor (empty and hidden until an editor fills it)
+print '<footer class="docstudio-statusbar" id="docstudio-status" aria-live="polite"></footer>'."\n";
 
 if ($provider !== null && count($viewers)) {
 	$viewerList = array();

@@ -1190,3 +1190,61 @@ body {
 .docstudio-check .ds-range {
 	margin-left: 4px;
 }
+
+/* Editor page: the options of the tool wrap inside their zone, Save stays at the top right and never moves */
+
+.docstudio-editor-page .docstudio-toolbar {
+	flex-wrap: nowrap;
+	align-items: flex-start;
+}
+
+.docstudio-editor-page .docstudio-filename,
+.docstudio-editor-page .docstudio-openwith {
+	flex: 0 1 auto;
+	min-width: 0;
+	line-height: 30px;
+}
+
+.docstudio-editor-page .docstudio-tools {
+	min-width: 0;
+}
+
+.docstudio-editor-page #docstudio-save {
+	flex: 0 0 auto;
+	margin-left: auto;
+}
+
+/* Status bar of the editors (like the image editors): zoom on the left, help of the tool, information on the right */
+
+.docstudio-statusbar {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 4px 12px;
+	min-height: 36px;
+	background: var(--ds-surface);
+	border-top: 1px solid var(--ds-border);
+	color: var(--ds-muted);
+}
+
+.docstudio-statusbar:empty {
+	display: none;
+}
+
+.docstudio-statusbar .ds-hint {
+	flex: 1 1 auto;
+	min-width: 0;
+	white-space: normal;
+}
+
+.docstudio-statusbar .ds-zoom,
+.docstudio-statusbar .ds-page-indicator,
+.docstudio-statusbar .ds-status-info {
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+
+.docstudio-statusbar .ds-status-info {
+	margin-left: auto;
+	font-variant-numeric: tabular-nums;
+}

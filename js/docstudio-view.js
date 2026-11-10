@@ -28,6 +28,8 @@ const DS = window.DocStudio;
 const cfg = DS.getConfig();
 const main = document.getElementById('docstudio-main');
 const tools = document.getElementById('docstudio-tools');
+// Bottom bar of the editor page (zoom, help), null on the viewer page: the viewers then use the toolbar
+const statusbar = document.getElementById('docstudio-status');
 const select = document.getElementById('docstudio-viewer-select');
 const allowed = (cfg.viewers || []).map(function (v) {
 	return v.code;
@@ -148,6 +150,9 @@ async function open(code) {
 	}
 	current = null;
 	tools.replaceChildren();
+	if (statusbar) {
+		statusbar.replaceChildren();
+	}
 	showMessage(DS.t('DocStudioLoading'), false);
 	const loading = main.firstChild;
 	main.className = 'docstudio-main docstudio-viewer-' + code;
@@ -157,7 +162,7 @@ async function open(code) {
 	container.className = 'docstudio-container';
 	main.appendChild(container);
 	try {
-		const mounted = await impl.mount({ container: container, toolbar: tools, file: file, config: cfg, t: DS.t, utils: DS.utils });
+		const mounted = await impl.mount({ container: container, toolbar: tools, statusbar: statusbar, file: file, config: cfg, t: DS.t, utils: DS.utils });
 		loading.remove();
 		current = mounted || null;
 	} catch (e) {

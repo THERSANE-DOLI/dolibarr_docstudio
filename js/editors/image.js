@@ -143,6 +143,9 @@ window.DocStudio.registerViewer('imageedit', {
 			photo = c;
 			width = c.width;
 			height = c.height;
+			if (sizeInfo) {
+				sizeInfo.textContent = width + ' × ' + height + ' px';
+			}
 			const img = new fabric.FabricImage(c, {
 				left: 0, top: 0, originX: 'left', originY: 'top',
 				selectable: false, evented: false, hasControls: false, objectCaching: false
@@ -756,7 +759,10 @@ window.DocStudio.registerViewer('imageedit', {
 		Object.keys(optionElements).forEach(function (k) {
 			ctx.toolbar.appendChild(optionElements[k]);
 		});
-		ctx.toolbar.append(hint, zoomBox);
+		// Bottom bar like the image editors: zoom on the left, help of the tool, size of the image on the right
+		const sizeInfo = document.createElement('span');
+		sizeInfo.className = 'ds-status-info';
+		(ctx.statusbar || ctx.toolbar).append(zoomBox, hint, sizeInfo);
 
 		const hints = {
 			select: t('DocStudioHintImgSelect'),

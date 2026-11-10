@@ -2,6 +2,11 @@
 
 ## 0.11
 
+- FIX: editors, the Save button moved down when the options of the tool took several lines :   0.11.2
+  - Save always at the top right, only the options of the tool wrap in their zone
+  - status bar at the bottom like the image editors: zoom, help of the tool and size of the image (image editor),
+    active page and help of the tool (PDF editor)
+
 - FIX: same checks as document.php of Dolibarr 24 (security audit) :   0.11.1
   - check per object (checkUserAccessToDocumentObject): a user restricted to his own customers can no longer view
     nor edit the documents of the other thirdparties

@@ -1390,7 +1390,9 @@ window.DocStudio.registerViewer('pdfedit', {
 			}
 		});
 
-		ctx.toolbar.append(pageIndicator, toolName, fontLabel, boldLabel, sizeLabel, colorLabel, cropAllLabel, imageButton, undoZone, hint);
+		ctx.toolbar.append(toolName, fontLabel, boldLabel, sizeLabel, colorLabel, cropAllLabel, imageButton, undoZone);
+		// Bottom bar, like the image editor: active page on the left, help of the tool
+		(ctx.statusbar || ctx.toolbar).append(pageIndicator, hint);
 		syncBold();
 
 		setDocument(pdfDocument);
