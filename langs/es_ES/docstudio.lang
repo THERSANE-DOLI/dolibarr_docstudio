@@ -252,8 +252,8 @@ DocStudioHintCutJpeg = El JPEG no tiene transparencia: el fondo quitado se vuelv
 
 # Layers (lot 2b)
 DocStudioLayers = Capas
-DocStudioLayersEmpty = Los elementos añadidos (flechas, textos, números...) aparecen aquí, el último arriba.
-DocStudioLayersHelp = Arrastre una capa para cambiar el orden (o Alt + flechas arriba y abajo). Doble clic en un nombre para renombrarlo.
+DocStudioLayersEmpty = Los elementos añadidos aparecen aquí.
+DocStudioLayersHelp = El último elemento añadido está arriba. Arrastre una capa para cambiar el orden (o Alt + flechas arriba y abajo), doble clic en un nombre para renombrarlo.
 DocStudioLayersShow = Mostrar las capas
 DocStudioLayersHide = Ocultar las capas
 DocStudioLayerText = Texto: %s

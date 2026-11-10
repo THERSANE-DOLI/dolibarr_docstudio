@@ -252,8 +252,8 @@ DocStudioHintCutJpeg = JPEG has no transparency: the removed background becomes 
 
 # Layers (lot 2b)
 DocStudioLayers = Layers
-DocStudioLayersEmpty = The elements you add (arrows, texts, numbers...) show here, the last one on top.
-DocStudioLayersHelp = Drag a layer to change the order (or Alt + up and down arrows). Double click on a name to rename it.
+DocStudioLayersEmpty = The elements you add show here.
+DocStudioLayersHelp = Last element added on top. Drag a layer to change the order (or Alt + up and down arrows), double click on a name to rename it.
 DocStudioLayersShow = Show the layers
 DocStudioLayersHide = Hide the layers
 DocStudioLayerText = Text: %s

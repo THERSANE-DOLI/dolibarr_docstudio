@@ -2,6 +2,11 @@
 
 ## 0.12
 
+- FIX: image editor, the layers panel jumped when the first elements were added :   0.12.2
+  - an element shows in the layers as soon as it is put, a text while it is written (its name follows)
+  - « no element » line of the height of a layer, help always at the bottom of the panel, room kept for the count
+    of the Layers button
+
 - FIX: editors, name of the tool higher than the name of the file in the top bar when the tool has no option :   0.12.1
 
 - NEW: image editor, layers panel :   0.12.0

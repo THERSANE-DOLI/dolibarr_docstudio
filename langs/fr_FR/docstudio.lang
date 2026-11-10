@@ -252,8 +252,8 @@ DocStudioHintCutJpeg = Le JPEG n'a pas de transparence : le fond retiré devient
 
 # Layers (lot 2b)
 DocStudioLayers = Calques
-DocStudioLayersEmpty = Les éléments ajoutés (flèches, textes, numéros...) s'affichent ici, le dernier au-dessus.
-DocStudioLayersHelp = Faites glisser un calque pour changer l'ordre (ou Alt + flèches haut et bas). Double-clic sur un nom pour le renommer.
+DocStudioLayersEmpty = Les éléments ajoutés s'affichent ici.
+DocStudioLayersHelp = Le dernier élément ajouté est en haut. Faites glisser un calque pour changer l'ordre (ou Alt + flèches haut et bas), double-clic sur un nom pour le renommer.
 DocStudioLayersShow = Afficher les calques
 DocStudioLayersHide = Masquer les calques
 DocStudioLayerText = Texte : %s

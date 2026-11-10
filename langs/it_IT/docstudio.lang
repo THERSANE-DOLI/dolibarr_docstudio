@@ -252,8 +252,8 @@ DocStudioHintCutJpeg = Il JPEG non ha trasparenza: lo sfondo tolto diventa bianc
 
 # Layers (lot 2b)
 DocStudioLayers = Livelli
-DocStudioLayersEmpty = Gli elementi aggiunti (frecce, testi, numeri...) appaiono qui, l'ultimo in alto.
-DocStudioLayersHelp = Trascina un livello per cambiare l'ordine (o Alt + frecce su e giù). Doppio clic su un nome per rinominarlo.
+DocStudioLayersEmpty = Gli elementi aggiunti appaiono qui.
+DocStudioLayersHelp = L'ultimo elemento aggiunto è in alto. Trascina un livello per cambiare l'ordine (o Alt + frecce su e giù), doppio clic su un nome per rinominarlo.
 DocStudioLayersShow = Mostra i livelli
 DocStudioLayersHide = Nascondi i livelli
 DocStudioLayerText = Testo: %s

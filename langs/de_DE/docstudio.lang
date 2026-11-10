@@ -252,8 +252,8 @@ DocStudioHintCutJpeg = JPEG hat keine Transparenz: Der entfernte Hintergrund wir
 
 # Layers (lot 2b)
 DocStudioLayers = Ebenen
-DocStudioLayersEmpty = Die hinzugefügten Elemente (Pfeile, Texte, Nummern...) erscheinen hier, das letzte oben.
-DocStudioLayersHelp = Ziehen Sie eine Ebene, um die Reihenfolge zu ändern (oder Alt + Pfeil nach oben und unten). Doppelklick auf einen Namen zum Umbenennen.
+DocStudioLayersEmpty = Die hinzugefügten Elemente erscheinen hier.
+DocStudioLayersHelp = Das zuletzt hinzugefügte Element ist oben. Ziehen Sie eine Ebene, um die Reihenfolge zu ändern (oder Alt + Pfeil nach oben und unten), Doppelklick auf einen Namen zum Umbenennen.
 DocStudioLayersShow = Ebenen anzeigen
 DocStudioLayersHide = Ebenen ausblenden
 DocStudioLayerText = Text: %s

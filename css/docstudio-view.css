@@ -1420,9 +1420,27 @@ body {
 
 .ds-layers-empty,
 .ds-layers-help {
-	margin: 8px 12px;
+	margin: 0;
 	color: var(--ds-muted);
 	font-size: 13px;
+}
+
+/* One line of the height of a layer: replaced by the first layer without moving the rest */
+.ds-layers-empty {
+	display: flex;
+	align-items: center;
+	min-height: 36px;
+	margin: 4px 4px 0;
+	padding: 0 8px;
+	border: 1px dashed var(--ds-border);
+	border-radius: 4px;
+}
+
+/* Help at the bottom of the panel, always shown */
+.ds-layers-help {
+	margin-top: auto;
+	padding: 8px 12px;
+	border-top: 1px solid var(--ds-border);
 }
 
 .ds-layers-toggle[aria-pressed="true"] {
@@ -1433,6 +1451,10 @@ body {
 
 .ds-layers-toggle {
 	gap: 4px;
+	/* Room for the count: the bar does not move when it appears */
+	min-width: 12ch;
+	justify-content: center;
+	font-variant-numeric: tabular-nums;
 }
 
 .ds-layers-toggle .ds-icon {

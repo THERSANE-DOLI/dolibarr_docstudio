@@ -1990,7 +1990,7 @@ window.DocStudio.registerViewer('imageedit', {
 		const layersHelp = document.createElement('p');
 		layersHelp.className = 'ds-layers-help';
 		layersHelp.textContent = t('DocStudioLayersHelp');
-		layersPanel.append(layersHead, layersList, layersEmpty, layersHelp);
+		layersPanel.append(layersHead, layersEmpty, layersList, layersHelp);
 		root.appendChild(layersPanel);
 
 		// Shown or not, remembered by this browser
@@ -2237,14 +2237,32 @@ window.DocStudio.registerViewer('imageedit', {
 			photoRow.title = t('DocStudioLayerPhotoFixed');
 			photoRow.append(photoIcon, photoName, photoLock);
 			layersList.appendChild(photoRow);
+			// Same height as a layer and help always there: the panel keeps its shape when the first element comes
 			layersEmpty.hidden = objects.length > 0;
-			layersHelp.hidden = objects.length < 2;
 			layersCount.textContent = String(objects.length);
 			layersToggleLabel.textContent = t('DocStudioLayers') + (objects.length ? ' (' + objects.length + ')' : '');
 			if (focusedIndex >= 0 && layersList.children[focusedIndex]) {
 				layersList.children[focusedIndex].focus();
 			}
 		}
+
+		// An element shows in the layers as soon as it is put (a text while it is written), not only at the next step
+		let layersFrame = 0;
+		function refreshLayersSoon() {
+			window.cancelAnimationFrame(layersFrame);
+			layersFrame = window.requestAnimationFrame(refreshLayers);
+		}
+		canvas.on('object:added', function (e) {
+			if (!restoring && e.target && !e.target.dsHelper && !e.target.dsBase) {
+				refreshLayersSoon();
+			}
+		});
+		canvas.on('object:removed', function (e) {
+			if (!restoring && e.target && !e.target.dsHelper && !e.target.dsBase) {
+				refreshLayersSoon();
+			}
+		});
+		canvas.on('text:changed', refreshLayersSoon);
 
 		/** Rows of the selected elements marked, without building the list again */
 		function syncLayerSelection() {
