@@ -1467,3 +1467,36 @@ body {
 		flex-basis: 180px;
 	}
 }
+
+/* Light / dark switch of the status bar: moon in light (to go dark), sun in dark */
+
+.ds-theme-switch {
+	flex: 0 0 auto;
+	padding: 4px 6px;
+}
+
+.ds-theme-switch .ds-icon {
+	width: 16px;
+	height: 16px;
+}
+
+.ds-theme-switch .ds-theme-sun,
+.ds-theme-switch[aria-checked="true"] .ds-theme-moon {
+	display: none;
+}
+
+.ds-theme-switch[aria-checked="true"] .ds-theme-sun {
+	display: inline-block;
+}
+
+html.ds-theme-fading *,
+html.ds-theme-fading *::before,
+html.ds-theme-fading *::after {
+	transition: background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease !important;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation: none;
+	mix-blend-mode: normal;
+}

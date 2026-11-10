@@ -36,6 +36,88 @@ const allowed = (cfg.viewers || []).map(function (v) {
 });
 const fileInfo = Object.freeze({ name: cfg.file.name, extension: cfg.file.extension, size: cfg.file.size });
 
+/* Light / dark switch of the status bar (edit page): saved for the user, the new theme grows in a circle from the
+   button (View Transitions API), else the colors cross-fade; at once when the user asks for reduced motion */
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function themeIcon(name, cls) {
+	const svg = document.createElementNS(SVG_NS, 'svg');
+	svg.setAttribute('class', 'ds-icon ' + cls);
+	svg.setAttribute('aria-hidden', 'true');
+	const use = document.createElementNS(SVG_NS, 'use');
+	use.setAttribute('href', '#ds-i-' + name);
+	svg.appendChild(use);
+	return svg;
+}
+
+/** The theme shown now is dark: forced dark (1), or like the system (2) with a dark system */
+function isDarkShown() {
+	const mode = document.documentElement.dataset.darkmode;
+	if (mode === '1') {
+		return true;
+	}
+	return mode === '2' && !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+
+function addThemeSwitch() {
+	if (!statusbar || !cfg.themeUrl) {
+		return;
+	}
+	const btn = document.createElement('button');
+	btn.type = 'button';
+	btn.className = 'docstudio-button ds-theme-switch';
+	btn.setAttribute('role', 'switch');
+	btn.setAttribute('aria-label', DS.t('DocStudioThemeDark'));
+	btn.append(themeIcon('moon', 'ds-theme-moon'), themeIcon('sun', 'ds-theme-sun'));
+	const paint = function () {
+		const dark = isDarkShown();
+		btn.setAttribute('aria-checked', String(dark));
+		btn.title = DS.t(dark ? 'DocStudioThemeToLight' : 'DocStudioThemeToDark');
+	};
+	paint();
+	// Next to the zoom (or the page), before the help of the tool
+	const hint = statusbar.querySelector('.ds-hint');
+	statusbar.insertBefore(btn, hint);
+	btn.addEventListener('click', function () {
+		const root = document.documentElement;
+		const theme = isDarkShown() ? 'light' : 'dark';
+		const apply = function () {
+			root.dataset.darkmode = theme === 'dark' ? '1' : '0';
+			void root.offsetHeight;
+			paint();
+		};
+		const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		if (reduced) {
+			apply();
+		} else if (document.startViewTransition) {
+			const box = btn.getBoundingClientRect();
+			const x = box.left + box.width / 2;
+			const y = box.top + box.height / 2;
+			const radius = Math.hypot(Math.max(x, window.innerWidth - x), Math.max(y, window.innerHeight - y));
+			const tr = document.startViewTransition(apply);
+			tr.ready.then(function () {
+				root.animate({ clipPath: ['circle(0 at ' + x + 'px ' + y + 'px)', 'circle(' + radius + 'px at ' + x + 'px ' + y + 'px)'] },
+					{ duration: 550, easing: 'ease-in-out', pseudoElement: '::view-transition-new(root)' });
+			}).catch(function () {
+				// Applied without animation
+			});
+		} else {
+			root.classList.add('ds-theme-fading');
+			apply();
+			window.setTimeout(function () {
+				root.classList.remove('ds-theme-fading');
+			}, 400);
+		}
+		const form = new FormData();
+		form.append('token', cfg.token || '');
+		form.append('theme', theme);
+		fetch(cfg.themeUrl, { method: 'POST', body: form, credentials: 'same-origin' }).catch(function () {
+			// Shown anyway, not remembered for the next page
+		});
+	});
+}
+
 let contentPromise = null;
 let current = null;
 
@@ -173,6 +255,7 @@ async function open(code) {
 	if (select) {
 		select.value = code;
 	}
+	addThemeSwitch();
 	if (window.Dolibarr && typeof window.Dolibarr.executeHook === 'function') {
 		window.Dolibarr.executeHook('docstudio:opened', { source: cfg.source, file: fileInfo, viewer: code });
 	}

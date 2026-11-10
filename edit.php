@@ -48,6 +48,7 @@ if (!$res) {
 dol_include_once('/docstudio/class/docstudio.class.php');
 dol_include_once('/docstudio/lib/docstudio.lib.php');
 dol_include_once('/docstudio/class/docstudiofonts.class.php');
+dol_include_once('/docstudio/class/docstudiopdftools.class.php');
 
 /**
  * @var Conf $conf
@@ -118,6 +119,11 @@ if ($provider !== null) {
 $cssUrl = docstudioAssetUrl('/docstudio/css/docstudio-view.css');
 // Same choice as the theme: 0 = light (default), 1 = dark, 2 = like the system
 $dark = isset($user->conf->THEME_DARKMODEENABLED) ? (int) $user->conf->THEME_DARKMODEENABLED : getDolGlobalInt('THEME_DARKMODEENABLED');
+// Light or dark chosen in DocStudio (switch of the status bar) wins, the theme of Dolibarr does not change
+$docstudioTheme = isset($user->conf->DOCSTUDIO_THEME) ? (string) $user->conf->DOCSTUDIO_THEME : '';
+if ($docstudioTheme === 'dark' || $docstudioTheme === 'light') {
+	$dark = $docstudioTheme === 'dark' ? 1 : 0;
+}
 
 print '<!DOCTYPE html>'."\n";
 print '<html class="docstudio-editor-page" lang="'.dol_escape_htmltag(substr($langs->defaultlang, 0, 2)).'" data-darkmode="'.((int) $dark).'"'.'>'."\n";
@@ -186,7 +192,9 @@ if ($provider !== null && count($viewers)) {
 		'token' => currentToken(),
 		'backUrl' => $backtopage,
 		'copyName' => preg_replace('/\.[^.]*$/', '', $provider->getFileName()).'-'.dol_sanitizeFileName($langs->transnoentitiesnoconv('DocStudioCopySuffix')).'.'.$provider->getExtension(),
-		'stirling' => false,
+		'compress' => DocStudioPdfTools::canCompress(),
+		'processUrl' => DocStudio::buildUrl('ajax/process.php', $source, $provider->getParams()),
+		'themeUrl' => dol_buildpath('/docstudio/ajax/theme.php', 1),
 		'fonts' => DocStudioFonts::forEditor(),
 		'fontkit' => dol_buildpath('/docstudio/vendor/fontkit/fontkit.umd.min.js', 1),
 		'imageMimeTypes' => DocStudio::getImageMimeTypes(),
@@ -239,6 +247,11 @@ if ($provider !== null && count($viewers)) {
 			'DocStudioCutFeather', 'DocStudioCutCorner', 'DocStudioCutSmooth', 'DocStudioCutPointHelp', 'DocStudioCutDeletePoint',
 			'DocStudioCutDeletePath', 'DocStudioCutAuto', 'DocStudioCutReset', 'DocStudioCutWandKept', 'DocStudioHintCutWand',
 			'DocStudioHintCutErase', 'DocStudioHintCutKeep', 'DocStudioHintCutPen', 'DocStudioHintCutJpeg',
+			// Compression
+			'DocStudioCompression', 'DocStudioCompressNone', 'DocStudioCompressLight', 'DocStudioCompressMedium', 'DocStudioCompressStrong',
+			'DocStudioCompressHelp', 'DocStudioCompressing', 'DocStudioErrorCompress',
+			// Theme
+			'DocStudioThemeDark', 'DocStudioThemeToLight', 'DocStudioThemeToDark',
 			// Layers
 			'DocStudioLayers', 'DocStudioLayersEmpty', 'DocStudioLayersHelp', 'DocStudioLayersShow', 'DocStudioLayersHide',
 			'DocStudioLayerText', 'DocStudioLayerNumber', 'DocStudioLayerRename', 'DocStudioLayerShow', 'DocStudioLayerHide',

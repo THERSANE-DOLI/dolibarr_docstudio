@@ -101,6 +101,11 @@ if ($provider !== null) {
 $cssUrl = docstudioAssetUrl('/docstudio/css/docstudio-view.css');
 // Same choice as the theme: 0 = light (default), 1 = dark, 2 = like the system
 $dark = isset($user->conf->THEME_DARKMODEENABLED) ? (int) $user->conf->THEME_DARKMODEENABLED : getDolGlobalInt('THEME_DARKMODEENABLED');
+// Light or dark chosen in DocStudio (switch of the status bar) wins, the theme of Dolibarr does not change
+$docstudioTheme = isset($user->conf->DOCSTUDIO_THEME) ? (string) $user->conf->DOCSTUDIO_THEME : '';
+if ($docstudioTheme === 'dark' || $docstudioTheme === 'light') {
+	$dark = $docstudioTheme === 'dark' ? 1 : 0;
+}
 
 print '<!DOCTYPE html>'."\n";
 print '<html lang="'.dol_escape_htmltag(substr($langs->defaultlang, 0, 2)).'" data-darkmode="'.((int) $dark).'"'.($embed ? ' class="docstudio-embed"' : '').'>'."\n";

@@ -162,6 +162,44 @@
 		}
 	}
 
+	/**
+	 * Tool of the server run on a content before it is saved (edit page only): 'compress' with {level}.
+	 * Nothing is stored by the server, the result comes back to be saved with saveContent.
+	 * @param {Blob} blob
+	 * @param {string} operation
+	 * @param {Object<string,string>} params
+	 * @returns {Promise<{blob: Blob, tool: string}>} Throws an Error with the message of the server
+	 */
+	async function processContent(blob, operation, params) {
+		const conf = getConfig();
+		const form = new FormData();
+		form.append('token', conf.token || '');
+		form.append('operation', operation);
+		Object.keys(params || {}).forEach(function (k) {
+			form.append(k, String(params[k]));
+		});
+		form.append('content', blob, 'content.' + conf.file.extension);
+		let response;
+		try {
+			response = await fetch(conf.processUrl, { method: 'POST', body: form, credentials: 'same-origin', redirect: 'error' });
+		} catch (e) {
+			throw new Error(t('DocStudioErrorCompress'));
+		}
+		if (!response.ok) {
+			let message = t('DocStudioErrorCompress');
+			try {
+				const data = await response.json();
+				if (data && data.error) {
+					message = String(data.error);
+				}
+			} catch (e) {
+				// Not JSON: generic message
+			}
+			throw new Error(message);
+		}
+		return { blob: await response.blob(), tool: response.headers.get('X-DocStudio-Tool') || '' };
+	}
+
 	const api = {
 		/**
 		 * Register the implementation of a viewer
@@ -189,6 +227,7 @@
 
 		getConfig: getConfig,
 		saveContent: saveContent,
+		processContent: processContent,
 		t: t,
 		utils: Object.freeze({ button: button, decodeText: decodeText })
 	};

@@ -1761,6 +1761,10 @@ window.DocStudio.registerViewer('pdfedit', {
 		/* Save dialog */
 
 		const saveButton = document.getElementById('docstudio-save');
+		// Compressing an untouched PDF is a reason to save
+		if (ctx.config.compress) {
+			saveButton.disabled = false;
+		}
 		const dialog = document.createElement('dialog');
 		dialog.className = 'ds-dialog';
 		const form = document.createElement('form');
@@ -1816,7 +1820,25 @@ window.DocStudio.registerViewer('pdfedit', {
 		});
 		confirm.classList.add('docstudio-primary');
 		buttons.append(cancel, confirm);
-		form.append(heading, copyLabel, nameLabel, replaceLabel, replaceWarning, splitInfo, impact, overwriteLabel, status, buttons);
+		// Compression by the server (Ghostscript or Stirling PDF), offered when the setup has one of them
+		const compressLabel = document.createElement('label');
+		compressLabel.className = 'ds-field';
+		compressLabel.textContent = t('DocStudioCompression') + ' ';
+		const compressSelect = document.createElement('select');
+		[['', t('DocStudioCompressNone')], ['light', t('DocStudioCompressLight')], ['medium', t('DocStudioCompressMedium')], ['strong', t('DocStudioCompressStrong')]].forEach(function (o) {
+			const option = document.createElement('option');
+			option.value = o[0];
+			option.textContent = o[1];
+			compressSelect.appendChild(option);
+		});
+		compressLabel.appendChild(compressSelect);
+		const compressHelp = document.createElement('p');
+		compressHelp.className = 'ds-hint';
+		compressHelp.textContent = t('DocStudioCompressHelp');
+		const compressBox = document.createElement('div');
+		compressBox.append(compressLabel, compressHelp);
+		compressBox.hidden = !ctx.config.compress;
+		form.append(heading, copyLabel, nameLabel, replaceLabel, replaceWarning, splitInfo, compressBox, impact, overwriteLabel, status, buttons);
 		dialog.appendChild(form);
 		document.body.appendChild(dialog);
 
@@ -1894,7 +1916,13 @@ window.DocStudio.registerViewer('pdfedit', {
 				const built = await buildPdf(function (text) {
 					status.textContent = text;
 				});
-				const files = await splitFiles(built.bytes);
+				let bytes = built.bytes;
+				if (ctx.config.compress && compressSelect.value) {
+					status.textContent = t('DocStudioCompressing');
+					const compressed = await window.DocStudio.processContent(new Blob([bytes], { type: 'application/pdf' }), 'compress', { level: compressSelect.value });
+					bytes = new Uint8Array(await compressed.blob.arrayBuffer());
+				}
+				const files = await splitFiles(bytes);
 				const names = fileNames();
 				const saved = [];
 				for (let i = 0; i < files.length; i++) {

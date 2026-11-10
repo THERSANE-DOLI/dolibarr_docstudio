@@ -1,5 +1,21 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.13
+
+- NEW: PDF editor, compression when saving, and light or dark theme switch in the status bar :   0.13.0
+  - compression none, light (images at 200 dpi), medium (150 dpi) or strong (100 dpi): only the images are reduced
+    and encoded again, the text stays text, the original is kept when the file is not smaller; also for a PDF saved
+    without any other change
+  - done by the server: Ghostscript first (on the Dolibarr server), Stirling PDF when Ghostscript is not set or fails;
+    nothing is saved when the compression fails (message saying what to do)
+  - setup « Server tools for the PDF editor »: path of Ghostscript, address and API key of Stirling PDF (stored
+    encrypted, never sent to the browser), Test button showing their versions
+  - setup: what the redaction really does (pages made images, checked, what is lost), and why Stirling PDF is not used
+    to redact (its zone redaction only puts a box over the text, measured on 1.3.2 and 2.1.4)
+  - switch light / dark next to the zoom of the editors, the new theme grows in a circle from the button, saved for
+    the user (the theme of Dolibarr does not change)
+  - FIX: messages of the server shown with HTML entities in the editors (é shown as &eacute;)
+
 ## 0.12
 
 - FIX: image editor, the layers panel jumped when the first elements were added :   0.12.2

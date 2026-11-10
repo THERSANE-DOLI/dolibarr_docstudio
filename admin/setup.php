@@ -57,6 +57,7 @@ if (!$res) {
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once '../lib/docstudio.lib.php';
 dol_include_once('/docstudio/class/docstudio.class.php');
+dol_include_once('/docstudio/class/docstudiopdftools.class.php');
 
 /**
  * @var Conf $conf
@@ -86,7 +87,51 @@ if (!$user->admin) {
  * Actions
  */
 
-// None: nothing to set in this version
+// Server tools of the PDF editor: Stirling PDF and Ghostscript (optional)
+if ($action == 'updatetools') {
+	$url = trim(GETPOST('DOCSTUDIO_STIRLING_URL', 'alphanohtml'));
+	$gs = trim(GETPOST('DOCSTUDIO_GHOSTSCRIPT_PATH', 'alphanohtml'));
+	$apiKey = GETPOST('DOCSTUDIO_STIRLING_API_KEY', 'none');
+	$error = 0;
+	if ($url !== '' && !preg_match('/^https?:\/\/[^\s]+$/i', $url)) {
+		setEventMessages($langs->trans('DocStudioStirlingBadUrl'), null, 'errors');
+		$error++;
+	}
+	// A path only (no options nor shell characters): the command is built by DocStudio
+	if ($gs !== '' && !preg_match('/^[A-Za-z0-9_\/\\.:\- ]+$/', $gs)) {
+		setEventMessages($langs->trans('DocStudioGhostscriptBadPath'), null, 'errors');
+		$error++;
+	}
+	if (!$error) {
+		dolibarr_set_const($db, 'DOCSTUDIO_STIRLING_URL', $url, 'chaine', 0, '', $conf->entity);
+		dolibarr_set_const($db, 'DOCSTUDIO_GHOSTSCRIPT_PATH', $gs, 'chaine', 0, '', $conf->entity);
+		// Empty field: the key saved stays (it is never shown again); box ticked: removed
+		if (GETPOST('DOCSTUDIO_STIRLING_API_KEY_REMOVE', 'int')) {
+			dolibarr_del_const($db, 'DOCSTUDIO_STIRLING_API_KEY', $conf->entity);
+		} elseif (is_string($apiKey) && trim($apiKey) !== '') {
+			// Name ending with _KEY: stored encrypted by dolibarr_set_const
+			dolibarr_set_const($db, 'DOCSTUDIO_STIRLING_API_KEY', trim($apiKey), 'chaine', 0, '', $conf->entity);
+		}
+		setEventMessages($langs->trans('SetupSaved'), null, 'mesgs');
+	}
+	header('Location: '.$_SERVER['PHP_SELF'].'#docstudio-tools');
+	exit;
+}
+
+// Test of the tools, from the values saved
+$testResults = array();
+if ($action == 'testtools') {
+	$tools = new DocStudioPdfTools();
+	if (DocStudioPdfTools::hasStirling()) {
+		$version = $tools->getStirlingVersion();
+		$testResults['stirling'] = $version !== '' ? array(true, $langs->transnoentitiesnoconv('DocStudioStirlingOk', $version)) : array(false, $langs->transnoentitiesnoconv('DocStudioStirlingKo', $tools->error));
+	}
+	if (DocStudioPdfTools::hasGhostscript()) {
+		$tools->error = '';
+		$version = $tools->getGhostscriptVersion();
+		$testResults['ghostscript'] = $version !== '' ? array(true, $langs->transnoentitiesnoconv('DocStudioGhostscriptOk', $version)) : array(false, $langs->transnoentitiesnoconv('DocStudioGhostscriptKo', $tools->error));
+	}
+}
 
 
 /*
@@ -133,6 +178,43 @@ print img_picto('', $contextOk ? 'tick' : 'warning', 'class="pictofixedwidth"').
 print '</td></tr>';
 print '</table>';
 print '</div>';
+print '<br>';
+
+// Server tools of the PDF editor
+print '<a id="docstudio-tools"></a>';
+print load_fiche_titre($langs->trans("DocStudioServerTools"), '', '');
+print '<p class="opacitymedium">'.$langs->trans('DocStudioServerToolsHelp').'</p>';
+print '<form method="POST" action="'.dol_escape_htmltag($_SERVER['PHP_SELF']).'">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
+print '<input type="hidden" name="action" value="updatetools">';
+print '<div class="div-table-responsive-no-min">';
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre"><td>'.$langs->trans("Parameter").'</td><td>'.$langs->trans("Value").'</td></tr>';
+print '<tr class="oddeven"><td><label for="DOCSTUDIO_GHOSTSCRIPT_PATH">'.$langs->trans('DocStudioGhostscriptPath').'</label><br><span class="opacitymedium small">'.$langs->trans('DocStudioGhostscriptPathHelp').'</span></td>';
+print '<td><input type="text" class="minwidth300" id="DOCSTUDIO_GHOSTSCRIPT_PATH" name="DOCSTUDIO_GHOSTSCRIPT_PATH" value="'.dol_escape_htmltag(getDolGlobalString('DOCSTUDIO_GHOSTSCRIPT_PATH')).'" placeholder="/usr/bin/gs" autocomplete="off" spellcheck="false"></td></tr>';
+print '<tr class="oddeven"><td><label for="DOCSTUDIO_STIRLING_URL">'.$langs->trans('DocStudioStirlingUrl').'</label><br><span class="opacitymedium small">'.$langs->trans('DocStudioStirlingUrlHelp').'</span></td>';
+print '<td><input type="url" class="minwidth300" id="DOCSTUDIO_STIRLING_URL" name="DOCSTUDIO_STIRLING_URL" value="'.dol_escape_htmltag(getDolGlobalString('DOCSTUDIO_STIRLING_URL')).'" placeholder="http://127.0.0.1:8080" autocomplete="off" spellcheck="false"></td></tr>';
+$hasKey = getDolGlobalString('DOCSTUDIO_STIRLING_API_KEY') !== '';
+print '<tr class="oddeven"><td><label for="DOCSTUDIO_STIRLING_API_KEY">'.$langs->trans('DocStudioStirlingApiKey').'</label><br><span class="opacitymedium small">'.$langs->trans('DocStudioStirlingApiKeyHelp').'</span></td>';
+print '<td><input type="password" class="minwidth300" id="DOCSTUDIO_STIRLING_API_KEY" name="DOCSTUDIO_STIRLING_API_KEY" value="" autocomplete="new-password" placeholder="'.dol_escape_htmltag($hasKey ? $langs->trans('DocStudioStirlingApiKeySaved') : '').'">';
+if ($hasKey) {
+	print ' <label class="nowraponall"><input type="checkbox" name="DOCSTUDIO_STIRLING_API_KEY_REMOVE" value="1"> '.$langs->trans('DocStudioStirlingApiKeyRemove').'</label>';
+}
+print '</td></tr>';
+print '</table>';
+print '</div>';
+print '<div class="center"><input type="submit" class="button button-save" value="'.dol_escape_htmltag($langs->trans('Save')).'">';
+if (DocStudioPdfTools::canCompress()) {
+	print ' <a class="button button-cancel" href="'.dol_escape_htmltag($_SERVER['PHP_SELF'].'?action=testtools&token='.newToken().'#docstudio-tools').'">'.$langs->trans('DocStudioTestTools').'</a>';
+}
+print '</div>';
+print '</form>';
+foreach ($testResults as $res) {
+	print '<div class="'.($res[0] ? 'ok' : 'error').' margintoponly">'.img_picto('', $res[0] ? 'tick' : 'error', 'class="pictofixedwidth"').dol_escape_htmltag($res[1]).'</div>';
+}
+// What redaction really does, written where the tools are chosen (analysis 5.1)
+print '<br>';
+print info_admin($langs->trans('DocStudioRedactionSetupHelp'), 0, 0, 'info');
 print '<br>';
 
 // Viewers

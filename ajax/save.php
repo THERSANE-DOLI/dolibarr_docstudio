@@ -113,26 +113,26 @@ if ($provider === null) {
 $extension = $provider->getExtension();
 if (!count($registry->getViewersFor($extension, $provider->getSize(), DocStudio::ACTION_EDIT))
 	|| $registry->getHandler($extension, $user, DocStudio::ACTION_EDIT) === DocStudio::HANDLER_NONE) {
-	docstudioSaveAnswer(array('error' => $langs->trans('DocStudioErrorNoEditor')), 403);
+	docstudioSaveAnswer(array('error' => $langs->transnoentitiesnoconv('DocStudioErrorNoEditor')), 403);
 }
 if (!$provider->canWrite($user)) {
-	docstudioSaveAnswer(array('error' => $langs->trans('DocStudioErrorCannotWrite')), 403);
+	docstudioSaveAnswer(array('error' => $langs->transnoentitiesnoconv('DocStudioErrorCannotWrite')), 403);
 }
 
 $upload = isset($_FILES['content']) ? $_FILES['content'] : null;
 if (!is_array($upload) || !isset($upload['error']) || $upload['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($upload['tmp_name'])) {
-	docstudioSaveAnswer(array('error' => $langs->trans('DocStudioErrorSave')), 400);
+	docstudioSaveAnswer(array('error' => $langs->transnoentitiesnoconv('DocStudioErrorSave')), 400);
 }
 $maxSize = getDolGlobalInt('DOCSTUDIO_MAX_SAVE_SIZE', 104857600);
 if ((int) $upload['size'] <= 0 || (int) $upload['size'] > $maxSize) {
-	docstudioSaveAnswer(array('error' => $langs->trans('DocStudioErrorTooBig')), 400);
+	docstudioSaveAnswer(array('error' => $langs->transnoentitiesnoconv('DocStudioErrorTooBig')), 400);
 }
 if (!DocStudio::isValidContent($extension, $upload['tmp_name'])) {
-	docstudioSaveAnswer(array('error' => $langs->trans('DocStudioErrorBadContent')), 400);
+	docstudioSaveAnswer(array('error' => $langs->transnoentitiesnoconv('DocStudioErrorBadContent')), 400);
 }
 // Images: only their pixels are kept (metadata and hidden data removed)
 if (!DocStudio::cleanContent($extension, $upload['tmp_name'])) {
-	docstudioSaveAnswer(array('error' => $langs->trans('DocStudioErrorBadContent')), 400);
+	docstudioSaveAnswer(array('error' => $langs->transnoentitiesnoconv('DocStudioErrorBadContent')), 400);
 }
 
 // Other modules may refuse (versioning, signed documents...): return > 0 with $this->error
@@ -141,7 +141,7 @@ $parameters = array('source' => $source, 'mode' => $mode, 'filename' => $fileNam
 $action = 'save';
 $reshook = $hookmanager->executeHooks('docstudioBeforeSave', $parameters, $provider, $action);
 if ($reshook != 0) {
-	docstudioSaveAnswer(array('error' => $hookmanager->error !== '' ? $hookmanager->error : $langs->trans('DocStudioErrorSave')), 403);
+	docstudioSaveAnswer(array('error' => $hookmanager->error !== '' ? $hookmanager->error : $langs->transnoentitiesnoconv('DocStudioErrorSave')), 403);
 }
 
 $result = $provider->save($upload['tmp_name'], $mode, $fileName, $overwrite, $user);
