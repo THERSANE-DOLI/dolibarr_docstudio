@@ -55,6 +55,7 @@ if (!$res) {
 dol_include_once('/docstudio/class/docstudio.class.php');
 dol_include_once('/docstudio/lib/docstudio.lib.php');
 dol_include_once('/docstudio/class/docstudiopdftools.class.php');
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
 /**
  * @var Conf $conf
@@ -124,12 +125,25 @@ $upload = isset($_FILES['content']) ? $_FILES['content'] : null;
 if (!is_array($upload) || !isset($upload['error']) || $upload['error'] !== UPLOAD_ERR_OK || !is_uploaded_file($upload['tmp_name'])) {
 	docstudioProcessError($langs->transnoentitiesnoconv('DocStudioErrorCompress'), 400);
 }
-$maxSize = getDolGlobalInt('DOCSTUDIO_MAX_SAVE_SIZE', 104857600);
+// Compression limited in size (DOCSTUDIO_MAX_COMPRESS_SIZE) and to one at a time for a user (audit DSTU-013)
+$maxSize = min(getDolGlobalInt('DOCSTUDIO_MAX_SAVE_SIZE', 104857600), DocStudioPdfTools::getMaxCompressSize());
 if ((int) $upload['size'] <= 0 || (int) $upload['size'] > $maxSize) {
 	docstudioProcessError($langs->transnoentitiesnoconv('DocStudioErrorTooBig'), 400);
 }
 if (!DocStudio::isValidContent($extension, $upload['tmp_name'])) {
 	docstudioProcessError($langs->transnoentitiesnoconv('DocStudioErrorBadContent'), 400);
+}
+// Antivirus before Ghostscript or Stirling PDF read it (audit DSTU-015)
+$virus = dolCheckVirus($upload['tmp_name'], $provider->getFileName());
+if (count($virus)) {
+	@unlink($upload['tmp_name']);
+	dol_syslog('docstudio/ajax/process.php content refused by the antivirus: '.implode(', ', $virus), LOG_WARNING);
+	docstudioProcessError($langs->transnoentitiesnoconv('DocStudioErrorVirus'), 403);
+}
+$userLock = DocStudioPdfTools::lockUser((int) $user->id);
+if ($userLock === false) {
+	@unlink($upload['tmp_name']);
+	docstudioProcessError($langs->transnoentitiesnoconv('DocStudioErrorCompressBusy'), 429);
 }
 
 $tools = new DocStudioPdfTools();

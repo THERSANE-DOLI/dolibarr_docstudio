@@ -56,6 +56,15 @@ class DocStudioWopiTest extends TestCase
 		$this->assertNull(DocStudioWopi::checkToken($forged.'.'.$sig, $fileId), 'Payload changed');
 		$this->assertNull(DocStudioWopi::checkToken($payload.'.'.strrev($sig), $fileId), 'Signature changed');
 		$this->assertNull(DocStudioWopi::checkToken('', $fileId));
+		// « Revoke the tokens »: a new generation refuses every token made before, the id of the file stays
+		global $conf;
+		$gen = isset($conf->global->DOCSTUDIO_WOPI_TOKEN_GEN) ? $conf->global->DOCSTUDIO_WOPI_TOKEN_GEN : null;
+		$conf->global->DOCSTUDIO_WOPI_TOKEN_GEN = (string) ((int) $gen + 1);
+		$this->assertNull(DocStudioWopi::checkToken($token['token'], $fileId), 'Revoked');
+		$this->assertSame($fileId, DocStudioWopi::fileId('document', $params, 1));
+		$conf->global->DOCSTUDIO_WOPI_TOKEN_GEN = $gen;
+		$this->assertIsArray(DocStudioWopi::checkToken($token['token'], $fileId));
+		$this->assertLessThanOrEqual(dol_now() + 4 * 3600, $token['expire'], '4 hours by default');
 		$this->assertNull(DocStudioWopi::checkToken(str_repeat('a', 5000).'.b', $fileId));
 	}
 

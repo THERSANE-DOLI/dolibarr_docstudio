@@ -344,3 +344,13 @@ DocStudioNoInstanceKey = L'identificativo unico dell'istanza ($dolibarr_main_ins
 
 # Copy filed in a piece (attachment of a mail, inbox C2)
 DocStudioSaveTo = Salva una copia in %s
+DocStudioErrorCompressBusy = Una compressione è già in corso per te: attendi che finisca, poi salva di nuovo.
+DocStudioGhostscriptProblemNotset = Ghostscript non è impostato.
+DocStudioGhostscriptProblemName = Il percorso deve indicare l'eseguibile di Ghostscript (gs, o gswin64c / gswin32c su Windows), fuori dalla cartella dei documenti di Dolibarr.
+DocStudioGhostscriptProblemMissing = Questo file non esiste o non è eseguibile sul server di Dolibarr.
+DocStudioGhostscriptProblemRestricted = gs non è in $dolibarr_main_restrict_os_commands del file conf.php: aggiungilo a questa lista per permettere la compressione.
+DocStudioGhostscriptProblemNoexec = La funzione exec di PHP è disattivata su questo server.
+DocStudioWopiRevokeTokens = Revoca i token in uso
+DocStudioWopiRevokeConfirm = Tutti i documenti aperti nel server Office o in Office installato non potranno più essere letti né salvati: gli utenti dovranno riaprirli da Dolibarr. Continuare?
+DocStudioWopiTokensRevoked = Token revocati: i documenti aperti devono essere riaperti da Dolibarr.
+DocStudioWopiTokensHelp = Ogni apertura dà al server Office un token valido %s h, per un utente, un file e una modalità. Si trova negli indirizzi che il server Office chiama (log del server web): « Revoca i token in uso » li rende tutti inutilizzabili.

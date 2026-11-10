@@ -344,3 +344,13 @@ DocStudioNoInstanceKey = L'identifiant unique de l'instance ($dolibarr_main_inst
 
 # Copy filed in a piece (attachment of a mail, inbox C2)
 DocStudioSaveTo = Enregistrer une copie dans %s
+DocStudioErrorCompressBusy = Une compression est déjà en cours pour vous : attendez qu'elle se termine, puis enregistrez de nouveau.
+DocStudioGhostscriptProblemNotset = Ghostscript n'est pas renseigné.
+DocStudioGhostscriptProblemName = Le chemin doit désigner l'exécutable de Ghostscript (gs, ou gswin64c / gswin32c sous Windows), en dehors du dossier des documents de Dolibarr.
+DocStudioGhostscriptProblemMissing = Ce fichier n'existe pas ou n'est pas exécutable sur le serveur de Dolibarr.
+DocStudioGhostscriptProblemRestricted = gs n'est pas dans $dolibarr_main_restrict_os_commands du fichier conf.php : ajoutez-le à cette liste pour permettre la compression.
+DocStudioGhostscriptProblemNoexec = La fonction exec de PHP est désactivée sur ce serveur.
+DocStudioWopiRevokeTokens = Révoquer les jetons en cours
+DocStudioWopiRevokeConfirm = Tous les documents ouverts dans le serveur bureautique ou dans Office installé ne pourront plus être lus ni enregistrés : les utilisateurs devront les rouvrir depuis Dolibarr. Continuer ?
+DocStudioWopiTokensRevoked = Jetons révoqués : les documents ouverts doivent être rouverts depuis Dolibarr.
+DocStudioWopiTokensHelp = Chaque ouverture donne au serveur bureautique un jeton valable %s h, pour un utilisateur, un fichier et un mode. Il figure dans les adresses que le serveur bureautique appelle (journaux du serveur web) : « Révoquer les jetons en cours » les rend tous inutilisables.

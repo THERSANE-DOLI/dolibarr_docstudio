@@ -34,8 +34,11 @@
  */
 class DocStudioWopi
 {
-	/** Life of an access token, in seconds (a session of work in the office server) */
-	const TOKEN_TTL = 36000;
+	/**
+	 * Life of an access token by default, in seconds (a session of work): 4 hours, DOCSTUDIO_WOPI_TOKEN_HOURS (1 to 24)
+	 * changes it (audit DSTU-014)
+	 */
+	const TOKEN_TTL = 14400;
 
 	/** Life of a lock of WOPI, in seconds */
 	const LOCK_TTL = 1800;
@@ -521,6 +524,27 @@ class DocStudioWopi
 	}
 
 	/**
+	 * Secret of the signature of the tokens: the key of the files plus a generation, changed by « Revoke the tokens »
+	 * of the setup (every token made before is refused; the ids of the files stay the same)
+	 *
+	 * @return string
+	 */
+	protected static function tokenKey()
+	{
+		return hash_hmac('sha256', 'tokens|'.getDolGlobalInt('DOCSTUDIO_WOPI_TOKEN_GEN'), self::key(), true);
+	}
+
+	/**
+	 * @return int Seconds
+	 */
+	public static function getTokenTtl()
+	{
+		$hours = getDolGlobalInt('DOCSTUDIO_WOPI_TOKEN_HOURS');
+
+		return $hours > 0 ? min(24, $hours) * 3600 : self::TOKEN_TTL;
+	}
+
+	/**
 	 * @param string $data
 	 * @return string
 	 */
@@ -542,7 +566,7 @@ class DocStudioWopi
 	 */
 	public static function makeToken(User $fuser, $entity, $source, array $params, $mode, array $extra = array())
 	{
-		$expire = dol_now() + self::TOKEN_TTL;
+		$expire = dol_now() + self::getTokenTtl();
 		$payload = self::b64(json_encode(array(
 			'u' => (int) $fuser->id,
 			'e' => (int) $entity,
@@ -553,7 +577,7 @@ class DocStudioWopi
 			'f' => self::fileId($source, $params, $entity),
 		) + $extra));
 
-		return array('token' => $payload.'.'.self::b64(hash_hmac('sha256', $payload, self::key(), true)), 'expire' => $expire);
+		return array('token' => $payload.'.'.self::b64(hash_hmac('sha256', $payload, self::tokenKey(), true)), 'expire' => $expire);
 	}
 
 	/**
@@ -566,7 +590,7 @@ class DocStudioWopi
 		if (!self::hasKey() || !is_string($token) || strlen($token) > 4096 || !preg_match('/^([A-Za-z0-9_-]+)\.([A-Za-z0-9_-]+)$/', $token, $m)) {
 			return null;
 		}
-		if (!hash_equals(self::b64(hash_hmac('sha256', $m[1], self::key(), true)), $m[2])) {
+		if (!hash_equals(self::b64(hash_hmac('sha256', $m[1], self::tokenKey(), true)), $m[2])) {
 			return null;
 		}
 		$data = json_decode((string) base64_decode(strtr($m[1], '-_', '+/')), true);

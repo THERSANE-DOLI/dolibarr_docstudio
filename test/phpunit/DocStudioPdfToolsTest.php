@@ -77,6 +77,35 @@ class DocStudioPdfToolsTest extends TestCase
 	}
 
 	/**
+	 * Only the executable of Ghostscript is run (audit DSTU-012)
+	 *
+	 * @return void
+	 */
+	public function testGhostscriptPath()
+	{
+		global $conf, $dolibarr_main_restrict_os_commands;
+		$saved = $dolibarr_main_restrict_os_commands;
+		$conf->global->DOCSTUDIO_GHOSTSCRIPT_PATH = '';
+		$this->assertSame('notset', DocStudioPdfTools::ghostscriptProblem());
+		$conf->global->DOCSTUDIO_GHOSTSCRIPT_PATH = PHP_BINARY;
+		$this->assertSame('name', DocStudioPdfTools::ghostscriptProblem(), 'Another program');
+		$conf->global->DOCSTUDIO_GHOSTSCRIPT_PATH = 'gs';
+		$this->assertSame('name', DocStudioPdfTools::ghostscriptProblem(), 'Not a full path');
+		$conf->global->DOCSTUDIO_GHOSTSCRIPT_PATH = '/nonexistent/gs';
+		$this->assertSame('missing', DocStudioPdfTools::ghostscriptProblem());
+		if (is_executable('/usr/bin/gs')) {
+			$conf->global->DOCSTUDIO_GHOSTSCRIPT_PATH = '/usr/bin/gs';
+			$dolibarr_main_restrict_os_commands = '';
+			$this->assertSame('', DocStudioPdfTools::ghostscriptProblem());
+			$dolibarr_main_restrict_os_commands = 'mysqldump, clamscan';
+			$this->assertSame('restricted', DocStudioPdfTools::ghostscriptProblem(), 'Not in the commands allowed by conf.php');
+			$dolibarr_main_restrict_os_commands = 'mysqldump, gs';
+			$this->assertSame('', DocStudioPdfTools::ghostscriptProblem());
+		}
+		$dolibarr_main_restrict_os_commands = $saved;
+	}
+
+	/**
 	 * Unknown level refused; with Ghostscript, a PDF without images is not made bigger (original kept)
 	 *
 	 * @return void

@@ -2,6 +2,15 @@
 
 ## 0.19
 
+- FIX: security audit 2026-11-10-b, points DSTU-012 to DSTU-015 :   0.19.1
+  - Ghostscript: only an executable named gs (gswin64c / gswin32c on Windows), outside of the documents of Dolibarr,
+    and allowed by $dolibarr_main_restrict_os_commands of conf.php (add « gs » to this list); the Test button says why
+    it is refused
+  - compression: one at a time for a user, 60 s at most for Ghostscript (DOCSTUDIO_GHOSTSCRIPT_TIMEOUT), 50 MB at most
+    (DOCSTUDIO_MAX_COMPRESS_SIZE), the PDF checked by the antivirus before Ghostscript or Stirling PDF read it
+  - tokens of the office server and of the desktop Office: 4 hours (DOCSTUDIO_WOPI_TOKEN_HOURS, 1 to 24), button
+    « Revoke the tokens in use » of the setup (every token made before refused, with a confirmation)
+
 - NEW: editors, copy filed in a piece for a file that only takes copies elsewhere (attachment of a mail) :   0.19.0
   - « Annotate and file » of inbox: the PDF or image editor opens on the attachment (read only), the saving puts
     a copy in the documents of the piece chosen in inbox, the mail stays as it is

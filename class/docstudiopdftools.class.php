@@ -59,12 +59,55 @@ class DocStudioPdfTools
 		return self::getStirlingUrl() !== '';
 	}
 
+	/** Names of the executable of Ghostscript: nothing else is run (audit DSTU-012) */
+	const GHOSTSCRIPT_NAMES = '/^(gs|gswin64c|gswin32c)(\.exe)?$/i';
+
 	/**
-	 * @return bool Ghostscript is set (its path is not checked here)
+	 * Why Ghostscript cannot be used, '' when it can: not set, not an executable named gs, not allowed by
+	 * $dolibarr_main_restrict_os_commands of conf.php, exec disabled
+	 *
+	 * @return string '', 'notset', 'name', 'missing', 'restricted', 'noexec'
+	 */
+	public static function ghostscriptProblem()
+	{
+		global $dolibarr_main_restrict_os_commands;
+
+		$bin = trim(getDolGlobalString('DOCSTUDIO_GHOSTSCRIPT_PATH'));
+		if ($bin === '') {
+			return 'notset';
+		}
+		if (!preg_match(self::GHOSTSCRIPT_NAMES, basename($bin)) || strpos($bin, '/') !== 0 && !preg_match('#^[A-Za-z]:[\\\\/]#', $bin)) {
+			return 'name';
+		}
+		if (!is_file($bin) || !is_executable($bin)) {
+			return 'missing';
+		}
+		// Never a file of the documents of Dolibarr (where files are uploaded)
+		$real = realpath($bin);
+		$data = realpath(DOL_DATA_ROOT);
+		if ($real === false || ($data !== false && strpos($real, rtrim($data, '/').'/') === 0)) {
+			return 'name';
+		}
+		// Same list as the commands Dolibarr itself may run (its name, like the core compares it)
+		if (!empty($dolibarr_main_restrict_os_commands)) {
+			$allowed = array_map('trim', explode(',', (string) $dolibarr_main_restrict_os_commands));
+			if (!in_array(basename($bin), $allowed, true)) {
+				return 'restricted';
+			}
+		}
+		if (!function_exists('exec')) {
+			return 'noexec';
+		}
+
+		return '';
+	}
+
+	/**
+	 * @return bool Ghostscript may be run
 	 */
 	public static function hasGhostscript()
 	{
-		return trim(getDolGlobalString('DOCSTUDIO_GHOSTSCRIPT_PATH')) !== '' && function_exists('exec');
+		return self::ghostscriptProblem() === '';
 	}
 
 	/**
@@ -96,11 +139,52 @@ class DocStudioPdfTools
 	}
 
 	/**
-	 * @return int Seconds
+	 * @return int Seconds of Stirling PDF
 	 */
 	protected static function getTimeout()
 	{
 		return max(10, getDolGlobalInt('DOCSTUDIO_STIRLING_TIMEOUT', 120));
+	}
+
+	/**
+	 * @return int Seconds of Ghostscript (audit DSTU-013: shorter than Stirling, it runs on the Dolibarr server)
+	 */
+	protected static function getGhostscriptTimeout()
+	{
+		return max(10, getDolGlobalInt('DOCSTUDIO_GHOSTSCRIPT_TIMEOUT', 60));
+	}
+
+	/**
+	 * Biggest PDF sent to the compression, in bytes (DOCSTUDIO_MAX_COMPRESS_SIZE in MB, 50 by default)
+	 *
+	 * @return int
+	 */
+	public static function getMaxCompressSize()
+	{
+		return max(1, getDolGlobalInt('DOCSTUDIO_MAX_COMPRESS_SIZE', 50)) * 1048576;
+	}
+
+	/**
+	 * One compression at a time for a user (audit DSTU-013): lock held until the end of the request
+	 *
+	 * @param int $userId
+	 * @return resource|false Handle of the lock, false when a compression of this user runs already
+	 */
+	public static function lockUser($userId)
+	{
+		$dir = DOL_DATA_ROOT.'/docstudio/temp';
+		if (dol_mkdir($dir) < 0) {
+			return false;
+		}
+		$fh = @fopen($dir.'/compress-'.((int) $userId).'.lock', 'c');
+		if ($fh === false || !flock($fh, LOCK_EX | LOCK_NB)) {
+			if ($fh !== false) {
+				fclose($fh);
+			}
+			return false;
+		}
+
+		return $fh;
 	}
 
 	/**
@@ -150,8 +234,10 @@ class DocStudioPdfTools
 	 */
 	public function getGhostscriptVersion()
 	{
-		if (!self::hasGhostscript()) {
-			$this->error = 'Not set';
+		$problem = self::ghostscriptProblem();
+		if ($problem !== '') {
+			global $langs;
+			$this->error = $langs->transnoentitiesnoconv('DocStudioGhostscriptProblem'.ucfirst($problem));
 			return '';
 		}
 		$output = array();
@@ -244,7 +330,7 @@ class DocStudioPdfTools
 		);
 		$cmd = escapeshellarg(self::getGhostscriptBin()).' '.implode(' ', array_map('escapeshellarg', $args)).' 2>&1';
 		if (is_executable('/usr/bin/timeout')) {
-			$cmd = '/usr/bin/timeout '.self::getTimeout().' '.$cmd;
+			$cmd = '/usr/bin/timeout '.self::getGhostscriptTimeout().' '.$cmd;
 		}
 		$output = array();
 		$code = -1;

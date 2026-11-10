@@ -102,6 +102,10 @@ if ($action == 'updatetools') {
 	if ($gs !== '' && !preg_match('/^[A-Za-z0-9_\/\\.:\- ]+$/', $gs)) {
 		setEventMessages($langs->trans('DocStudioGhostscriptBadPath'), null, 'errors');
 		$error++;
+	} elseif ($gs !== '' && !preg_match(DocStudioPdfTools::GHOSTSCRIPT_NAMES, basename($gs))) {
+		// Only the executable of Ghostscript (audit DSTU-012)
+		setEventMessages($langs->trans('DocStudioGhostscriptProblemName'), null, 'errors');
+		$error++;
 	}
 	if (!$error) {
 		dolibarr_set_const($db, 'DOCSTUDIO_STIRLING_URL', $url, 'chaine', 0, '', $conf->entity);
@@ -151,6 +155,15 @@ if ($action == 'updatewopi') {
 	exit;
 }
 
+// Revoke every token of the office server and of the desktop Office (audit DSTU-014): new generation of their key
+if ($action == 'confirm_revoketokens' && GETPOST('confirm', 'alpha') === 'yes') {
+	dolibarr_set_const($db, 'DOCSTUDIO_WOPI_TOKEN_GEN', (string) (getDolGlobalInt('DOCSTUDIO_WOPI_TOKEN_GEN') + 1), 'chaine', 0, '', $conf->entity);
+	dol_syslog('docstudio/admin/setup.php tokens of the office server revoked by '.$user->login, LOG_NOTICE);
+	setEventMessages($langs->trans('DocStudioWopiTokensRevoked'), null, 'mesgs');
+	header('Location: '.$_SERVER['PHP_SELF'].'#docstudio-wopi');
+	exit;
+}
+
 // Test of the tools, from the values saved
 $testResults = array();
 if ($action == 'testwopi' && DocStudioWopi::isEnabled()) {
@@ -175,7 +188,8 @@ if ($action == 'testtools') {
 		$version = $tools->getStirlingVersion();
 		$testResults['stirling'] = $version !== '' ? array(true, $langs->transnoentitiesnoconv('DocStudioStirlingOk', $version)) : array(false, $langs->transnoentitiesnoconv('DocStudioStirlingKo', $tools->error));
 	}
-	if (DocStudioPdfTools::hasGhostscript()) {
+	// Set but refused (name, restricted commands of conf.php...): the reason is shown
+	if (DocStudioPdfTools::ghostscriptProblem() !== 'notset') {
 		$tools->error = '';
 		$version = $tools->getGhostscriptVersion();
 		$testResults['ghostscript'] = $version !== '' ? array(true, $langs->transnoentitiesnoconv('DocStudioGhostscriptOk', $version)) : array(false, $langs->transnoentitiesnoconv('DocStudioGhostscriptKo', $tools->error));
@@ -253,7 +267,7 @@ print '</td></tr>';
 print '</table>';
 print '</div>';
 print '<div class="center"><input type="submit" class="button button-save" value="'.dol_escape_htmltag($langs->trans('Save')).'">';
-if (DocStudioPdfTools::canCompress()) {
+if (getDolGlobalString('DOCSTUDIO_GHOSTSCRIPT_PATH') !== '' || getDolGlobalString('DOCSTUDIO_STIRLING_URL') !== '') {
 	print ' <a class="button button-cancel" href="'.dol_escape_htmltag($_SERVER['PHP_SELF'].'?action=testtools&token='.newToken().'#docstudio-tools').'">'.$langs->trans('DocStudioTestTools').'</a>';
 }
 print '</div>';
@@ -289,9 +303,15 @@ print '</div>';
 print '<div class="center"><input type="submit" class="button button-save" value="'.dol_escape_htmltag($langs->trans('Save')).'">';
 if (DocStudioWopi::isEnabled()) {
 	print ' <a class="button button-cancel" href="'.dol_escape_htmltag($_SERVER['PHP_SELF'].'?action=testwopi&token='.newToken().'#docstudio-wopi').'">'.$langs->trans('DocStudioTestTools').'</a>';
+	print ' <a class="button button-delete" href="'.dol_escape_htmltag($_SERVER['PHP_SELF'].'?action=revoketokens&token='.newToken().'#docstudio-wopi').'">'.$langs->trans('DocStudioWopiRevokeTokens').'</a>';
 }
 print '</div>';
 print '</form>';
+print '<p class="opacitymedium small">'.$langs->trans('DocStudioWopiTokensHelp', (int) (DocStudioWopi::getTokenTtl() / 3600)).'</p>';
+if ($action == 'revoketokens') {
+	$form = new Form($db);
+	print $form->formconfirm($_SERVER['PHP_SELF'], $langs->trans('DocStudioWopiRevokeTokens'), $langs->trans('DocStudioWopiRevokeConfirm'), 'confirm_revoketokens', '', 0, 1);
+}
 foreach (array('wopi', 'wopiproof') as $key) {
 	if (isset($testResults[$key])) {
 		$res = $testResults[$key];
