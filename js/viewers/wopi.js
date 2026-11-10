@@ -62,7 +62,10 @@ function mountWopi(ctx, editing) {
 	const status = document.createElement('span');
 	status.className = 'docstudio-pageinfo';
 	status.setAttribute('role', 'status');
-	ctx.toolbar.appendChild(status);
+	// Only the editing says something (saving when leaving): no empty bar when reading
+	if (editing) {
+		ctx.toolbar.appendChild(status);
+	}
 
 	function post(message) {
 		if (frame.contentWindow) {

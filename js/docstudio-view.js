@@ -255,6 +255,10 @@ async function open(code) {
 	if (select) {
 		select.value = code;
 	}
+	// Integrated in a host that shows the name and the download (embed=2): a header only for the tools of the viewer
+	if (document.documentElement.classList.contains('docstudio-bare')) {
+		tools.closest('header').hidden = !tools.querySelector('button, input, select, a') && tools.textContent.trim() === '';
+	}
 	addThemeSwitch();
 	if (window.Dolibarr && typeof window.Dolibarr.executeHook === 'function') {
 		window.Dolibarr.executeHook('docstudio:opened', { source: cfg.source, file: fileInfo, viewer: code });

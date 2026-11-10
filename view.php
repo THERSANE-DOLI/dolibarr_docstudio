@@ -108,7 +108,10 @@ if ($docstudioTheme === 'dark' || $docstudioTheme === 'light') {
 }
 
 print '<!DOCTYPE html>'."\n";
-print '<html lang="'.dol_escape_htmltag(substr($langs->defaultlang, 0, 2)).'" data-darkmode="'.((int) $dark).'"'.($embed ? ' class="docstudio-embed"' : '').'>'."\n";
+// embed=2: the host (window of inbox...) already shows the name, the download, the opening in a tab and the choice of
+// the viewer; only the tools of the viewer stay, and no header at all when it has none
+$bare = $embed === 2;
+print '<html lang="'.dol_escape_htmltag(substr($langs->defaultlang, 0, 2)).'" data-darkmode="'.((int) $dark).'"'.($embed ? ' class="docstudio-embed'.($bare ? ' docstudio-bare' : '').'"' : '').'>'."\n";
 print '<head>'."\n";
 print '<meta charset="utf-8">'."\n";
 print '<meta name="viewport" content="width=device-width, initial-scale=1">'."\n";
@@ -126,21 +129,23 @@ print '<body>'."\n";
 
 // Icons of the buttons (inline sprite: no request, allowed by the content security policy)
 print file_get_contents(__DIR__.'/img/docstudio-icons.svg');
-print '<header class="docstudio-toolbar">';
-print '<span class="docstudio-filename" title="'.dol_escape_htmltag($title).'">'.dol_escape_htmltag($title).'</span>';
+print '<header class="docstudio-toolbar"'.($bare ? ' hidden' : '').'>';
+if (!$bare) {
+	print '<span class="docstudio-filename" title="'.dol_escape_htmltag($title).'">'.dol_escape_htmltag($title).'</span>';
+}
 print '<span class="docstudio-tools" id="docstudio-tools"></span>';
-if (count($viewers) > 1) {
+if (count($viewers) > 1 && !$bare) {
 	print '<label class="docstudio-openwith">'.dol_escape_htmltag($langs->trans('DocStudioOpenWith')).' <select id="docstudio-viewer-select">';
 	foreach ($viewers as $code => $viewer) {
 		print '<option value="'.dol_escape_htmltag($code).'">'.dol_escape_htmltag($viewer['label']).'</option>';
 	}
 	print '</select></label>';
 }
-if ($embed && $provider !== null) {
+if ($embed && !$bare && $provider !== null) {
 	$selfUrl = DocStudio::buildUrl('view.php', $source, $provider->getParams());
 	print '<a class="docstudio-button docstudio-icon-button" href="'.dol_escape_htmltag($selfUrl).'" target="_blank" rel="noopener" title="'.dol_escape_htmltag($langs->trans('DocStudioOpenInNewTab')).'" aria-label="'.dol_escape_htmltag($langs->trans('DocStudioOpenInNewTab')).'"><svg class="ds-icon" aria-hidden="true"><use href="#ds-i-external"></use></svg></a>';
 }
-if ($provider !== null && $provider->getDownloadUrl() !== '') {
+if ($provider !== null && !$bare && $provider->getDownloadUrl() !== '') {
 	print '<a class="docstudio-button" href="'.dol_escape_htmltag($provider->getDownloadUrl()).'" download>'.dol_escape_htmltag($langs->trans('Download')).'</a>';
 }
 print '</header>'."\n";

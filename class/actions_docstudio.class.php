@@ -56,7 +56,8 @@ class ActionsDocStudio extends CommonHookActions
 
 	/**
 	 * Viewers of DocStudio for the attachments of a mail of inbox (« Open with… » of inbox, lot 5). Inbox shows the
-	 * page in its own window; it adds « force=1 » when the user opens an attachment not scanned by the antivirus.
+	 * page in its own window, which has the name, the download and the opening in a tab (embed=2: not repeated by the
+	 * page); it adds « force=1 » when the user opens an attachment not scanned by the antivirus.
 	 *
 	 * @param array{mail:int,attachments:array<int,array{part:int,name:string,extension:string,size:int}>} $parameters
 	 * @param mixed       $object      Not used
@@ -90,7 +91,7 @@ class ActionsDocStudio extends CommonHookActions
 				$out[(int) $part][] = array(
 					'code' => $code,
 					'label' => $viewer['label'],
-					'url' => DocStudio::buildUrl('view.php', 'inbox', array('mail' => (int) $parameters['mail'], 'part' => (int) $part, 'force' => 0)).'&viewer='.rawurlencode($code).'&embed=1',
+					'url' => DocStudio::buildUrl('view.php', 'inbox', array('mail' => (int) $parameters['mail'], 'part' => (int) $part, 'force' => 0)).'&viewer='.rawurlencode($code).'&embed=2',
 				);
 			}
 		}

@@ -2,6 +2,11 @@
 
 ## 0.16
 
+- FIX: viewer in the window of inbox, name of the file, download and opening in a tab shown twice :   0.16.1
+  - embed=2 (asked by the hook for inbox): the page shows no name, download, opening in a tab nor choice of the
+    viewer, the window of the host has them; only the tools of the viewer stay, no header at all when it has none
+    (office server)
+
 - NEW: attachments of the mails of inbox opened by DocStudio (lot 5) :   0.16.0
   - source « inbox », read only, through the access given by inbox (InboxAttachmentFile): rights of the user on the
     mailbox, antivirus of inbox first, nothing written
