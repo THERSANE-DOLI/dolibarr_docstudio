@@ -31,6 +31,9 @@ class DocStudioSecurityTest extends TestCase
 	/** @var string Test directory inside the ECM directory */
 	private static $dir;
 
+	/** @var string Directory outside of the data directory, reached by a symbolic link */
+	private static $extDir;
+
 	/**
 	 * Files used by the tests, in the ECM directory of the test instance
 	 *
@@ -48,6 +51,15 @@ class DocStudioSecurityTest extends TestCase
 		file_put_contents(self::$dir.'/script.exe.noexe', 'MZ');
 		@unlink(self::$dir.'/escape.txt');
 		symlink('/etc/hostname', self::$dir.'/escape.txt');
+
+		// Directory of the data directory moved to another disk by the administrator (symbolic link)
+		self::$extDir = sys_get_temp_dir().'/docstudio-ext-test';
+		dol_mkdir(self::$extDir);
+		file_put_contents(self::$extDir.'/moved.txt', "moved\n");
+		@unlink(self::$extDir.'/escape.txt');
+		symlink('/etc/hostname', self::$extDir.'/escape.txt');
+		@unlink(self::$dir.'/linkeddir');
+		symlink(self::$extDir, self::$dir.'/linkeddir');
 	}
 
 	/**
@@ -60,7 +72,25 @@ class DocStudioSecurityTest extends TestCase
 		foreach (array('note.txt', '.hidden.txt', 'big.txt', 'script.exe.noexe', 'escape.txt') as $file) {
 			@unlink(self::$dir.'/'.$file);
 		}
+		@unlink(self::$dir.'/linkeddir');
 		@rmdir(self::$dir);
+		@unlink(self::$extDir.'/moved.txt');
+		@unlink(self::$extDir.'/escape.txt');
+		@rmdir(self::$extDir);
+	}
+
+	/**
+	 * Accepted: file in a directory that is a symbolic link to another disk. Refused: file inside it that is a
+	 * symbolic link leaving its directory.
+	 *
+	 * @return void
+	 */
+	public function testSymlinkedDirectory()
+	{
+		list($res, $provider) = $this->load(array('file' => 'docstudio-test/linkeddir/moved.txt'));
+		$this->assertSame(1, $res, $provider->error);
+		list($res) = $this->load(array('file' => 'docstudio-test/linkeddir/escape.txt'));
+		$this->assertSame(-1, $res, 'symbolic link to /etc/hostname in a linked directory must be refused');
 	}
 
 	/**

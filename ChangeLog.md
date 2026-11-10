@@ -2,6 +2,9 @@
 
 ## 0.10
 
+- FIX: document refused (dataroot) when a directory of the documents is a symbolic link to another disk :   0.10.2
+  - a file that is itself a symbolic link leaving the documents is still refused
+
 - FIX: superadmin refused on the documents of another entity (multicompany), reason of a refusal in the log :   0.10.1
   - the reason (entity, permission, thirdparty, dataroot) is also added to the message for administrators
 

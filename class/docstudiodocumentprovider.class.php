@@ -188,20 +188,36 @@ class DocStudioDocumentProvider extends DocStudioFileProvider
 	}
 
 	/**
-	 * The real path of a file (symbolic links resolved) is inside the data directory of Dolibarr
+	 * The file is inside the data directory of Dolibarr.
 	 *
-	 * @param string $path Full path
+	 * Directories of the data directory may be symbolic links to another disk (set by the administrator of the server,
+	 * Dolibarr never creates links): the path given by Dolibarr must be inside the data directory, then only the file
+	 * itself is checked. A file that is a symbolic link must point inside the data directory or inside its own directory.
+	 *
+	 * @param string $path Full path (without '..', checked by the caller)
 	 * @return bool
 	 */
 	public static function isInsideDataRoot($path)
 	{
-		$root = realpath(DOL_DATA_ROOT);
+		$root = rtrim(preg_replace('#/+#', '/', DOL_DATA_ROOT), '/').'/';
+		$path = preg_replace('#/+#', '/', $path);
+		$realRoot = realpath(DOL_DATA_ROOT);
 		$real = realpath($path);
-		if ($root === false || $real === false) {
+		if ($realRoot === false || $real === false || preg_match('/(^|\/)\.\.(\/|$)/', $path)) {
 			return false;
 		}
+		$realRoot = rtrim($realRoot, '/').'/';
 
-		return strpos($real, rtrim($root, '/').'/') === 0;
+		if (strpos($path, $root) !== 0) {
+			// Path not given under DOL_DATA_ROOT: only accepted if it really is inside it
+			return strpos($real, $realRoot) === 0;
+		}
+		if (!is_link($path)) {
+			return true;
+		}
+		$realDir = realpath(dirname($path));
+
+		return strpos($real, $realRoot) === 0 || ($realDir !== false && strpos($real, rtrim($realDir, '/').'/') === 0);
 	}
 
 	/**
