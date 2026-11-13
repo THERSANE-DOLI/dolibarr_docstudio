@@ -1,1 +1,3 @@
 analyses/
+docker/*/.env
+docker/*/dockerdata/

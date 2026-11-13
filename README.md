@@ -95,6 +95,48 @@ Dolibarr 23 or more, PHP 7.4 or more.
 zip): not used by the module, they can be removed or refused by the web server. As after any update of a module,
 disable and enable the module again when its version changed, so that its database updates run.
 
+## Office server in production
+
+The office server is optional. The browser of the user loads the editor directly from the office server (frame and
+WebSocket): the server must be reachable by the users, in HTTPS with a valid certificate (a frame in HTTP inside
+Dolibarr in HTTPS is blocked by the browser). Give it its own subdomain (`office.example.com`): it is the cleanest
+setup, the editor does not share the origin of Dolibarr.
+
+Euro-Office with Docker Compose (`docker/eurooffice/`, 4 GB of memory and 2 cores at least, image of 4.5 GB):
+
+1. On the server, in a folder outside of the web root (with Plesk: the folder of the subdomain,
+   `/var/www/vhosts/office.example.com/`, next to `httpdocs`), create `compose.yml` with the content of
+   `docker/eurooffice/compose.yml` and `.env` with the one of `.env.example`, then `chmod 600 .env` and set
+   `JWT_SECRET` (`openssl rand -hex 32`). The keys go in `dockerdata/Data` next to them.
+2. `docker compose up -d`, then `docker compose ps` until the state is `healthy` (about 1 minute on the first start).
+   The container only listens on `127.0.0.1:9982`.
+3. Create the subdomain with its certificate (Let's Encrypt) and send it to `http://127.0.0.1:9982` with a reverse
+   proxy that lets the WebSockets go through. With Plesk: the subdomain in its own subscription (not the one of
+   Dolibarr), SSL/TLS certificate, then Docker > Docker Proxy Rules (or additional nginx directives with
+   `proxy_pass`, `proxy_http_version 1.1`, the headers `Upgrade`, `Connection "upgrade"`, `Host` and
+   `X-Forwarded-Proto`).
+   Without more, any site can use this office server for its own files (WOPI is not covered by the JWT secret):
+   refuse in the proxy the WOPI pages whose `WOPISrc` is not your Dolibarr, before the general rule (nginx):
+
+   ```nginx
+   location ~ ^/hosting/wopi/ {
+       if ($args ~* "wopisrc=.*wopisrc=") { return 403; }
+       if ($arg_wopisrc !~* "^https(%3A|:)(%2F|/){2}dolibarr\.example\.com(%2F|/)") { return 403; }
+       # same proxy_pass and headers as the general rule
+   }
+   ```
+
+4. Check `https://office.example.com/hosting/discovery`: it must give an XML with a `proof-key`.
+5. In Setup > Modules > DocStudio, « Address of the office server »: `https://office.example.com`, then the Test button.
+   « Addresses allowed to call Dolibarr »: the address the office server calls Dolibarr from, as Dolibarr sees it
+   (often the public IP of the Docker server).
+6. Ghostscript (compression of PDF): add `gs` to `$dolibarr_main_restrict_os_commands` in `conf/conf.php`.
+
+The folder `dockerdata/Data` holds the keys that sign the calls of the office server (proof keys): keep it on updates, else the
+calls signed with a new key are refused until Dolibarr reads the office server again (Test button of the setup, or
+one hour later). Update: change the digest of the image in `compose.yml`,
+then `docker compose pull && docker compose up -d`.
+
 ## Licenses
 
 ### Main code
