@@ -1,0 +1,41 @@
+# Collabora Online (CODE), office server of DocStudio (WOPI)
+#
+# SAMPLE: copy it to compose.yml and adapt it. Read README.md of this folder first: the values below are examples, to
+# adapt to your server.
+#
+# Start:   cp compose.sample.yml compose.yml  &&  cp .env.example .env  (then set CO_ALIASGROUP)
+#          create the proof key (README.md, step 1)  &&  docker compose up -d
+# Logs:    docker compose logs -f
+# Update:  change the digest of the image, then  docker compose pull && docker compose up -d
+#
+# The container only listens on 127.0.0.1: publish it in HTTPS on its own subdomain through the reverse proxy of the
+# web server.
+
+name: docstudio-collabora
+
+services:
+  coolwsd:
+    # Collabora Online Development Edition 26.04.6.1, pinned by its digest, tested with DocStudio
+    image: collabora/code@sha256:95f29f1c0a1778999125f53f058d968fe0afb37c95e32ebfb9f3444140faebd2
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${CO_PORT:-9980}:9980"
+    environment:
+      # Only Dolibarr may use this office server: address of Dolibarr as the office server calls it (scheme, host, port;
+      # dots escaped, it is a regular expression). Several: aliasgroup2, aliasgroup3...
+      aliasgroup1: "${CO_ALIASGROUP:?set CO_ALIASGROUP in .env}"
+      # HTTPS done by the reverse proxy; no welcome dialog
+      extra_params: "--o:ssl.enable=false --o:ssl.termination=true --o:welcome.enable=false"
+      # No username / password: the admin console stays off
+    volumes:
+      # Key that signs the calls of the office server (proof key, README.md step 1), readable by the user 1001 of the
+      # image. Kept across updates, else Dolibarr refuses the calls until its Test button is clicked.
+      - ./proof_key:/etc/coolwsd/proof_key:ro
+
+# Fixed network: the container calls Dolibarr from an address of this range (when both are on the same server), the
+# one to allow in Dolibarr. EXAMPLE: choose a range free on your server (docker network ls, ip route).
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.1.0/24

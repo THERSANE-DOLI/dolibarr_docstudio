@@ -1,3 +1,5 @@
 analyses/
 docker/*/.env
-docker/*/dockerdata/
+docker/*/Data/
+docker/*/compose.yml
+docker/*/proof_key

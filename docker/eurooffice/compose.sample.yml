@@ -1,11 +1,14 @@
 # Euro-Office Docs, office server of DocStudio (WOPI)
 #
-# Start:   cp .env.example .env  (then set JWT_SECRET)  &&  docker compose up -d
+# SAMPLE: copy it to compose.yml and adapt it. Read README.md of this folder first: the values below are examples, to
+# adapt to your server.
+#
+# Start:   cp compose.sample.yml compose.yml  &&  cp .env.example .env  (then set JWT_SECRET)  &&  docker compose up -d
 # Logs:    docker compose logs -f
 # Update:  change the digest of the image, then  docker compose pull && docker compose up -d
 #
 # The container only listens on 127.0.0.1: publish it in HTTPS on its own subdomain through the reverse proxy of the
-# web server (see the README of DocStudio, « Office server in production »).
+# web server.
 
 name: docstudio-eurooffice
 
@@ -28,10 +31,18 @@ services:
       # and updates (else Dolibarr refuses the calls), and saved with the backups of the server. The container sets
       # its owner itself. No folder for the logs: an empty folder on /var/log/euro-office stops nginx, read them with
       # docker compose logs.
-      - ./dockerdata/Data:/var/www/euro-office/Data
+      - ./Data:/var/www/euro-office/Data
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost/healthcheck | grep -q true"]
       interval: 60s
       timeout: 10s
       start_period: 120s
       retries: 3
+
+# Fixed network: the container calls Dolibarr from an address of this range (when both are on the same server), the
+# one to allow in Dolibarr. EXAMPLE: choose a range free on your server (docker network ls, ip route).
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
