@@ -111,6 +111,17 @@ abstract class DocStudioFileProvider
 	}
 
 	/**
+	 * The file can be read without the session of the user: the office server (wopi.php) reads it with a token only.
+	 * False for a file that only the session of its user may read (mail of a protected mailbox of inbox).
+	 *
+	 * @return bool
+	 */
+	public function isReadableWithoutSession()
+	{
+		return true;
+	}
+
+	/**
 	 * Where the copies go when it is not next to the file (attachment of a mail filed in a piece): label shown in the
 	 * saving and page to go back to after it, null when the copy goes next to the file
 	 *

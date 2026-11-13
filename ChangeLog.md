@@ -2,6 +2,10 @@
 
 ## 0.19
 
+- FIX: office server not offered for the attachments of a protected mailbox of inbox :   0.19.3
+  - the office server reads the file without the session of the user, that a protected mailbox needs (it answered
+    « Resource not found or user unauthorized »): only the viewers of the browser are offered for these mails
+
 - FIX: security audit 2026-11-10-c, points DSTU-017 to DSTU-021 :   0.19.2
   - desktop Office (dav.php): a lock is held by its user, its token never given to the others (they see the file
     locked, Office opens it read only), lock and unlock with a token for editing only

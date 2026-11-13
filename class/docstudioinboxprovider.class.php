@@ -109,6 +109,49 @@ class DocStudioInboxProvider extends DocStudioFileProvider
 	}
 
 	/**
+	 * A mail of a protected mailbox is read only by the session that unlocked it (inbox), never by the office server
+	 *
+	 * @return bool
+	 */
+	public function isReadableWithoutSession()
+	{
+		return $this->mailId > 0 && !self::needsSession($this->db, $this->mailId);
+	}
+
+	/**
+	 * The mail belongs to a protected mailbox (read live or kept for the session that unlocked it): what the server
+	 * gives of it needs the session of the user. True too when it cannot be told (safe side).
+	 *
+	 * @param DoliDB $db
+	 * @param int    $mailId
+	 * @return bool
+	 */
+	public static function needsSession($db, $mailId)
+	{
+		if (!self::isAvailable()) {
+			return true;
+		}
+		if (dol_include_once('/inbox/class/inboxlive.class.php') && class_exists('InboxLive') && InboxLive::isMail((int) $mailId)) {
+			return true;
+		}
+		dol_include_once('/inbox/class/inboxaccount.class.php');
+		if (!class_exists('InboxAccount') || !method_exists('InboxAccount', 'isProtected')) {
+			// Inbox older than its protected mailboxes: none of them
+			return false;
+		}
+		$row = $db->getRow("SELECT fk_account FROM ".$db->prefix()."inbox_mail WHERE rowid = ".((int) $mailId));
+		if (!is_object($row)) {
+			return true;
+		}
+		$account = new InboxAccount($db);
+		if ($account->fetch((int) $row->fk_account) <= 0) {
+			return true;
+		}
+
+		return (bool) $account->isProtected();
+	}
+
+	/**
 	 * @return string
 	 */
 	public function getFileName()

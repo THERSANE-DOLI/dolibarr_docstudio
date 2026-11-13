@@ -119,6 +119,10 @@ if ($provider !== null) {
 	if (!DocStudioDesktop::isAllowedFor($source, $provider->getExtension())) {
 		unset($viewers['desktop'], $viewers['desktopedit']);
 	}
+	// The office server reads the file without the session of the user: not for a file that needs it (protected mailbox)
+	if (!$provider->isReadableWithoutSession()) {
+		unset($viewers['wopi'], $viewers['wopiedit']);
+	}
 }
 // « Edit with »: the editors the administrator allows for this type
 $defaultViewer = '';

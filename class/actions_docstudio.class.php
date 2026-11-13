@@ -78,6 +78,9 @@ class ActionsDocStudio extends CommonHookActions
 			return 0;
 		}
 		$langs->load('docstudio@docstudio');
+		// Mail of a protected mailbox: the office server cannot read it (no session), its viewers are not offered
+		dol_include_once('/docstudio/class/docstudioinboxprovider.class.php');
+		$noServer = DocStudioInboxProvider::needsSession($this->db, (int) $parameters['mail']);
 		$out = array();
 		foreach ($parameters['attachments'] as $part => $a) {
 			$extension = isset($a['extension']) ? (string) $a['extension'] : '';
@@ -89,6 +92,9 @@ class ActionsDocStudio extends CommonHookActions
 			}
 			// A received attachment never goes to the desktop Office (audit DSTU-018)
 			unset($viewers['desktop'], $viewers['desktopedit']);
+			if ($noServer) {
+				unset($viewers['wopi'], $viewers['wopiedit']);
+			}
 			foreach ($viewers as $code => $viewer) {
 				$out[(int) $part][] = array(
 					'code' => $code,
@@ -110,7 +116,7 @@ class ActionsDocStudio extends CommonHookActions
 				$list = $registry->getViewersFor($extension, isset($a['size']) ? (int) $a['size'] : 0, DocStudio::ACTION_EDIT);
 				$list = array_intersect_key($list, array_flip($registry->getUserChoices($extension, DocStudio::ACTION_EDIT)));
 				foreach ($list as $code => $viewer) {
-					if (!empty($viewer['inplace'])) {
+					if (!empty($viewer['inplace']) || ($noServer && in_array($code, array('wopi', 'wopiedit'), true))) {
 						continue;
 					}
 					$editors[(int) $part][] = array(

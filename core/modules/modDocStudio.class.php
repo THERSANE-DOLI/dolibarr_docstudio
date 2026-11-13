@@ -51,7 +51,7 @@ class modDocStudio extends DolibarrModules
 		$this->descriptionlong = "DocStudioDescriptionLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '0.19.2';
+		$this->version = '0.19.3';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
 		$this->picto = 'docstudio@docstudio';
 
