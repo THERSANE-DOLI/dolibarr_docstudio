@@ -168,8 +168,48 @@ class DocStudioWopiTest extends TestCase
 			$this->assertTrue(DocStudioWopi::isValidContent('docx', $docx));
 			$this->assertFalse(DocStudioWopi::isValidContent('odt', $docx), 'An OpenDocument has a mimetype entry');
 			$this->assertFalse(DocStudioWopi::isValidContent('pdf', $docx), 'Not a type written back');
+			$this->assertFalse(DocStudioWopi::isValidContent('csv', $docx), 'A package is not a CSV');
 			@unlink($docx);
 		}
 		@unlink($fake);
+	}
+
+	/**
+	 * CSV and TXT written back by the office server: plain text only
+	 *
+	 * @return void
+	 */
+	public function testTextContent()
+	{
+		$this->assertContains('csv', DocStudioWopi::WRITABLE_EXTENSIONS);
+		$this->assertContains('txt', DocStudioWopi::WRITABLE_EXTENSIONS);
+		$this->assertNotContains('csv', DocStudioWopi::OFFICE_EXTENSIONS, 'CSV shown by the viewer of DocStudio, given to the office server for editing only');
+		$cases = array(
+			array('csv', "ref;designation;stock\r\nSW-0101;Sweat « Vague »;150\r\n", true, 'UTF-8 with separators and CRLF'),
+			array('csv', "ref\tqty\n\"A;1\";2\n", true, 'Tabs and quotes'),
+			array('txt', "Ligne 1\nD\xE9but en Windows-1252\f\n", true, 'Single byte encoding, form feed'),
+			array('txt', "\xEF\xBB\xBFTexte avec BOM\n", true, 'UTF-8 BOM'),
+			array('csv', "a,b\n\x00c,d\n", false, 'NUL byte'),
+			array('txt', "\xFF\xFEt\x00e\x00x\x00t\x00", false, 'UTF-16'),
+			array('txt', "texte\x1B[31m rouge\n", false, 'Control character'),
+			array('csv', "PK\x03\x04rest of a zip", false, 'ZIP package'),
+			array('txt', "%PDF-1.4\n%%EOF", false, 'PDF'),
+			array('txt', "\x89PNG\r\n\x1A\n", false, 'PNG'),
+			array('csv', "\xD0\xCF\x11\xE0\xA1\xB1\x1A\xE1", false, 'Old Office (OLE)'),
+		);
+		foreach ($cases as $case) {
+			list($ext, $content, $expected, $label) = $case;
+			$file = tempnam(sys_get_temp_dir(), 'dst');
+			file_put_contents($file, $content);
+			$this->assertSame($expected, DocStudioWopi::isValidContent($ext, $file), $label);
+			@unlink($file);
+		}
+		// Longer than one chunk: a NUL byte after the first megabyte is still found
+		$file = tempnam(sys_get_temp_dir(), 'dst');
+		file_put_contents($file, str_repeat("a;b;c\n", 200000)."\x00");
+		$this->assertFalse(DocStudioWopi::isValidContent('csv', $file), 'NUL byte after 1 MB');
+		file_put_contents($file, str_repeat("a;b;c\n", 200000));
+		$this->assertTrue(DocStudioWopi::isValidContent('csv', $file), 'Large CSV');
+		@unlink($file);
 	}
 }

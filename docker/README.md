@@ -1,7 +1,8 @@
 # Office servers for DocStudio
 
-DocStudio opens and edits the Office and OpenDocument files of Dolibarr in the browser with an office server (WOPI),
-saved in place with the rights of each user. This folder holds samples to install one of them with Docker Compose:
+DocStudio opens and edits the Office and OpenDocument files of Dolibarr (and the CSV and text files) in the browser
+with an office server (WOPI), saved in place with the rights of each user. This folder holds samples to install one of
+them with Docker Compose:
 
 | Folder | Office server | Notes |
 |---|---|---|

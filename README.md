@@ -17,7 +17,8 @@ View the documents of Dolibarr without leaving it.
   pages (rotate, delete, reorder, split into several files), crop and redaction (pages redacted turned into images, result checked). Saved as a copy or instead of the
   original, with the permission to change the documents of the object.
 - Office server (optional): Collabora Online, OnlyOffice or Euro-Office (WOPI) open and edit the Office and
-  OpenDocument files in place, signature of their calls checked.
+  OpenDocument files in place, and also the CSV and text files (shown by the viewers of DocStudio, given to the
+  office server for editing only, written back as plain text), signature of their calls checked.
 - Office installed on the computer (optional): « Open in Excel, Word, PowerPoint » by a signed address valid on
   that computer only (small WebDAV server `dav.php`), saved in place.
 - Same permissions as the download: a user who cannot download a file cannot view it.

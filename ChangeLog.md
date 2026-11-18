@@ -1,5 +1,15 @@
 # CHANGELOG DOCSTUDIO FOR [DOLIBARR ERP & CRM](https://www.dolibarr.org)
 
+## 0.20
+
+- NEW: CSV and text files edited with the office server :   0.20.0
+  - the pencil opens CSV and TXT in Collabora Online, ONLYOFFICE or Euro-Office, the viewers of DocStudio keep
+    showing them (table, text)
+  - what the office server writes back is checked as plain text: no signature of another format, no NUL byte nor
+    control character (UTF-8 or the single byte encoding of the file; UTF-16 refused)
+  - Collabora opens these files in view mode with a warning about the formatting a CSV cannot keep: the user goes to
+    « Edit mode » to change them; a CSV keeps values only, never formulas
+
 ## 0.19
 
 - FIX: search of the PDF viewer, words cut into several pieces by the PDF never found :   0.19.4

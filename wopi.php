@@ -28,7 +28,8 @@
  *
  * Every call: the signed token gives the user, the entity, the file and the mode; the user must still be active and
  * the file is loaded again by its provider with the rights of this user (same checks as the pages of DocStudio).
- * Saving: write permission checked again, ZIP package of the type of the file, size, antivirus, hook docstudioBeforeSave.
+ * Saving: write permission checked again, ZIP package of the type of the file (plain text for CSV and TXT), size,
+ * antivirus, hook docstudioBeforeSave.
  * Caller: address in DOCSTUDIO_WOPI_ALLOWED_IPS when set; signature of the office server (WOPI proof keys) when its
  * discovery gives a public key (DOCSTUDIO_WOPI_PROOF_OFF, hidden: only logged, for a troubleshooting).
  */
@@ -366,7 +367,7 @@ fclose($out);
 
 if ($size <= 0 || !DocStudioWopi::isValidContent($extension, $tmpFile)) {
 	@unlink($tmpFile);
-	dol_syslog('docstudio/wopi.php PutFile refused (not a package of type '.$extension.') file='.$provider->getFileName(), LOG_WARNING);
+	dol_syslog('docstudio/wopi.php PutFile refused (not a valid content of type '.$extension.') file='.$provider->getFileName(), LOG_WARNING);
 	docstudioWopiAnswer(400);
 }
 

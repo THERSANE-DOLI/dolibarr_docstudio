@@ -53,7 +53,8 @@ class DocStudioWopi
 	const DEFAULT_EXTENSIONS = array('docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'doc', 'xls', 'ppt', 'rtf');
 
 	/**
-	 * Office documents only: the office server also opens PDF, images or text, better shown by the viewers of DocStudio
+	 * Office documents opened for viewing: the office server also opens PDF, images or text, better shown by the viewers
+	 * of DocStudio (CSV and TXT are only given to it for editing, see WRITABLE_EXTENSIONS)
 	 */
 	const OFFICE_EXTENSIONS = array(
 		'doc', 'docx', 'docm', 'dot', 'dotx', 'odt', 'ott', 'rtf', 'fodt',
@@ -62,8 +63,14 @@ class DocStudioWopi
 		'odg', 'vsd', 'vsdx',
 	);
 
-	/** Types the office server may write back (Office Open XML and OpenDocument: ZIP packages) */
-	const WRITABLE_EXTENSIONS = array('docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp');
+	/**
+	 * Types the office server may write back: Office Open XML and OpenDocument (ZIP packages), CSV and plain text (opened
+	 * by the office server for editing only, the viewers of DocStudio show them)
+	 */
+	const WRITABLE_EXTENSIONS = array('docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'csv', 'txt');
+
+	/** Text types among the writable ones: checked as text, not as a package */
+	const TEXT_EXTENSIONS = array('csv', 'txt');
 
 	/** @var string */
 	public $error = '';
@@ -692,7 +699,8 @@ class DocStudioWopi
 	}
 
 	/**
-	 * Content written back by the office server: a ZIP package (Office Open XML, OpenDocument) of the type of the file
+	 * Content written back by the office server: a ZIP package (Office Open XML, OpenDocument) of the type of the file,
+	 * or plain text for CSV and TXT
 	 *
 	 * @param string $extension
 	 * @param string $file
@@ -702,6 +710,9 @@ class DocStudioWopi
 	{
 		if (!in_array($extension, self::WRITABLE_EXTENSIONS, true)) {
 			return false;
+		}
+		if (in_array($extension, self::TEXT_EXTENSIONS, true)) {
+			return self::isText($file);
 		}
 		$head = (string) @file_get_contents($file, false, null, 0, 4);
 		if ($head !== "PK\x03\x04") {
@@ -717,6 +728,44 @@ class DocStudioWopi
 		$isOdf = in_array($extension, array('odt', 'ods', 'odp'), true);
 		$ok = $isOdf ? $zip->locateName('mimetype') !== false : $zip->locateName('[Content_Types].xml') !== false;
 		$zip->close();
+
+		return $ok;
+	}
+
+	/**
+	 * Plain text written back for a CSV or a TXT: no signature of another format (ZIP, PDF, images, old Office), no NUL
+	 * byte nor control character other than tab, line feed, carriage return and form feed. UTF-8 or a single byte
+	 * encoding (the one of the file at its opening); UTF-16, which has NUL bytes, is refused.
+	 *
+	 * @param string $file
+	 * @return bool
+	 */
+	public static function isText($file)
+	{
+		$fh = @fopen($file, 'rb');
+		if ($fh === false) {
+			return false;
+		}
+		$head = (string) fread($fh, 8);
+		foreach (array("PK\x03\x04", '%PDF', "\x89PNG", "\xFF\xD8\xFF", 'GIF8', "\xD0\xCF\x11\xE0") as $magic) {
+			if (strncmp($head, $magic, strlen($magic)) === 0) {
+				fclose($fh);
+				return false;
+			}
+		}
+		rewind($fh);
+		$ok = true;
+		while ($ok && !feof($fh)) {
+			$chunk = fread($fh, 1048576);
+			if ($chunk === false) {
+				$ok = false;
+				break;
+			}
+			if (preg_match('/[\x00-\x08\x0B\x0E-\x1F\x7F]/', $chunk)) {
+				$ok = false;
+			}
+		}
+		fclose($fh);
 
 		return $ok;
 	}
