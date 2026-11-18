@@ -2,6 +2,11 @@
 
 ## 0.19
 
+- FIX: search of the PDF viewer, words cut into several pieces by the PDF never found :   0.19.4
+  - the pieces of text of a page are put end to end (a space only where the PDF has one and at the end of a line),
+    like the search of pdf.js: « revendeur » is found in a PDF made by Chrome, that cuts it into « r », « e », « v »...
+  - the highlighting follows the found text across the pieces, instead of the pieces that hold all of it
+
 - FIX: office server not offered for the attachments of a protected mailbox of inbox :   0.19.3
   - the office server reads the file without the session of the user, that a protected mailbox needs (it answered
     « Resource not found or user unauthorized »): only the viewers of the browser are offered for these mails

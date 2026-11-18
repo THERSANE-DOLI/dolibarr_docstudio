@@ -35,6 +35,31 @@ function normalize(text) {
 	return String(text).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ');
 }
 
+/**
+ * Searchable text of pieces of text, with the place of each piece in it. pdf.js often cuts a word into several pieces
+ * (kerning, changes of font): the pieces are put end to end, a space only where the PDF has one and at the end of a
+ * line, so that a word cut in pieces is still found.
+ * @param {Array<{str: string, eol: boolean}>} pieces
+ * @returns {{text: string, ranges: Array<Array<number>>}} normalized text, [start, end[ of each piece in it
+ */
+function joinPieces(pieces) {
+	let text = '';
+	const ranges = pieces.map(function (piece) {
+		let str = normalize(piece.str);
+		if (text.endsWith(' ') && str.startsWith(' ')) {
+			str = str.slice(1);
+		}
+		const start = text.length;
+		text += str;
+		const range = [start, text.length];
+		if (piece.eol && text !== '' && !text.endsWith(' ')) {
+			text += ' ';
+		}
+		return range;
+	});
+	return { text: text, ranges: ranges };
+}
+
 window.DocStudio.registerViewer('pdf', {
 	async mount(ctx) {
 		const conf = ctx.config.pdfjs;
@@ -141,9 +166,27 @@ window.DocStudio.registerViewer('pdf', {
 		 * @param {Object} p
 		 */
 		function highlight(p) {
-			const spans = p.wrapper.querySelectorAll('.textLayer span');
-			spans.forEach(function (span) {
-				span.classList.toggle('docstudio-hit', query !== '' && normalize(span.textContent).indexOf(query) >= 0);
+			// Spans holding text (not the marked content groups), in reading order; a <br> ends a line
+			const spans = Array.prototype.filter.call(p.wrapper.querySelectorAll('.textLayer span'), function (span) {
+				return !span.querySelector('span');
+			});
+			const joined = joinPieces(spans.map(function (span) {
+				const next = span.nextSibling;
+				return { str: span.textContent, eol: !!next && next.nodeName === 'BR' };
+			}));
+			const found = [];
+			if (query !== '') {
+				let pos = joined.text.indexOf(query);
+				while (pos >= 0) {
+					found.push([pos, pos + query.length]);
+					pos = joined.text.indexOf(query, pos + query.length);
+				}
+			}
+			spans.forEach(function (span, i) {
+				const r = joined.ranges[i];
+				span.classList.toggle('docstudio-hit', r[1] > r[0] && found.some(function (f) {
+					return r[0] < f[1] && r[1] > f[0];
+				}));
 			});
 		}
 
@@ -287,9 +330,11 @@ window.DocStudio.registerViewer('pdf', {
 		async function pageText(p) {
 			if (p.text === null) {
 				const content = await p.page.getTextContent();
-				p.text = normalize(content.items.map(function (item) {
-					return item.str || '';
-				}).join(' '));
+				p.text = joinPieces(content.items.filter(function (item) {
+					return typeof item.str === 'string';
+				}).map(function (item) {
+					return { str: item.str, eol: !!item.hasEOL };
+				})).text;
 			}
 			return p.text;
 		}
