@@ -2,6 +2,12 @@
 
 ## 0.20
 
+- FIX: picto of the module broken in the list of the modules, the permissions and the tabs of the setup :   0.20.1
+  - img_picto() adds « .png » to a picto without extension, and the module ships svg only: the image was looked for
+    in img/object_docstudio.png and img/docstudio.png, absent, then outside custom/ (404 on each page)
+  - the picto is given with its extension (docstudio.svg@docstudio): img/object_docstudio.svg in the list of the
+    modules (both views) and the permissions of a user, img/docstudio.svg in the tabs of the four setup pages
+
 - NEW: CSV and text files edited with the office server :   0.20.0
   - the pencil opens CSV and TXT in Collabora Online, ONLYOFFICE or Euro-Office, the viewers of DocStudio keep
     showing them (table, text)

@@ -156,7 +156,7 @@ $linkback = '<a href="'.($backtopage ? $backtopage : DOL_URL_ROOT.'/admin/module
 print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 
 $head = docstudioAdminPrepareHead();
-print dol_get_fiche_head($head, 'associations', $langs->trans($title), -1, 'docstudio@docstudio');
+print dol_get_fiche_head($head, 'associations', $langs->trans($title), -1, 'docstudio.svg@docstudio');
 
 print '<span class="opacitymedium">'.$langs->trans("DocStudioAssociationsHelp").'</span><br><br>';
 

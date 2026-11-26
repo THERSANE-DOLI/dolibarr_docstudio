@@ -217,7 +217,7 @@ print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 
 // Configuration header
 $head = docstudioAdminPrepareHead();
-print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, 'docstudio@docstudio');
+print dol_get_fiche_head($head, 'settings', $langs->trans($title), -1, 'docstudio.svg@docstudio');
 
 print '<span class="opacitymedium">'.$langs->trans("DocStudioSetupPage").'</span><br><br>';
 

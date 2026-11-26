@@ -51,9 +51,11 @@ class modDocStudio extends DolibarrModules
 		$this->descriptionlong = "DocStudioDescriptionLong";
 		$this->editor_name = 'THERSANE';
 		$this->editor_url = 'https://www.thersane.fr';
-		$this->version = '0.20.0';
+		$this->version = '0.20.1';
 		$this->const_name = 'MAIN_MODULE_'.strtoupper($this->name);
-		$this->picto = 'docstudio@docstudio';
+		// With its extension: img_picto() adds « .png » to a picto without one, and the module ships its pictos as svg
+		// only (img/object_docstudio.svg here, img/docstudio.svg in the tabs of the setup pages)
+		$this->picto = 'docstudio.svg@docstudio';
 
 		$this->module_parts = array(
 			'triggers' => 0,
