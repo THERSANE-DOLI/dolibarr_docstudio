@@ -104,7 +104,7 @@ print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 
 // Configuration header
 $head = docstudioAdminPrepareHead();
-print dol_get_fiche_head($head, 'about', $langs->trans($title), 0, 'docstudio@docstudio');
+print dol_get_fiche_head($head, 'about', $langs->trans($title), 0, 'docstudio.svg@docstudio');
 
 dol_include_once('/docstudio/core/modules/modDocStudio.class.php');
 $tmpmodule = new modDocStudio($db);

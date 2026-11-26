@@ -117,7 +117,7 @@ $linkback = '<a href="'.DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_valu
 print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 
 $head = docstudioAdminPrepareHead();
-print dol_get_fiche_head($head, 'fonts', $langs->trans($title), -1, 'docstudio@docstudio');
+print dol_get_fiche_head($head, 'fonts', $langs->trans($title), -1, 'docstudio.svg@docstudio');
 
 if ($action == 'delete' && $slug !== '') {
 	print $form->formconfirm($_SERVER['PHP_SELF'].'?slug='.urlencode($slug), $langs->trans('DocStudioFontDelete'), $langs->trans('DocStudioFontDeleteConfirm'), 'confirm_delete', '', 0, 1);
