@@ -83,7 +83,7 @@ class ActionsDocStudio extends CommonHookActions
 		$noServer = DocStudioInboxProvider::needsSession($this->db, (int) $parameters['mail']);
 		$out = array();
 		foreach ($parameters['attachments'] as $part => $a) {
-			$extension = isset($a['extension']) ? (string) $a['extension'] : '';
+			$extension = isset($a['extension']) ? strtolower((string) $a['extension']) : '';
 			$viewers = $registry->getViewersFor($extension, isset($a['size']) ? (int) $a['size'] : 0);
 			// The viewers the administrator allows for this type, like the lists of documents (all when none)
 			$allowed = array_intersect_key($viewers, array_flip($registry->getUserChoices($extension)));
@@ -94,6 +94,12 @@ class ActionsDocStudio extends CommonHookActions
 			unset($viewers['desktop'], $viewers['desktopedit']);
 			if ($noServer) {
 				unset($viewers['wopi'], $viewers['wopiedit']);
+			}
+			// The handler chosen by the user, else by the administrator, first: inbox opens the first one, as the lists
+			// of documents open this handler (the others stay in « Open with… »)
+			$handler = $registry->getHandler($extension, $user);
+			if (isset($viewers[$handler])) {
+				$viewers = array($handler => $viewers[$handler]) + $viewers;
 			}
 			foreach ($viewers as $code => $viewer) {
 				$out[(int) $part][] = array(
@@ -109,7 +115,7 @@ class ActionsDocStudio extends CommonHookActions
 		$editors = array();
 		if (empty($user->socid)) {
 			foreach ($parameters['attachments'] as $part => $a) {
-				$extension = isset($a['extension']) ? (string) $a['extension'] : '';
+				$extension = isset($a['extension']) ? strtolower((string) $a['extension']) : '';
 				if ($registry->getHandler($extension, $user, DocStudio::ACTION_EDIT) === DocStudio::HANDLER_NONE) {
 					continue;
 				}

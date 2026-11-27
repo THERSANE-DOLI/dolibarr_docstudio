@@ -2,6 +2,10 @@
 
 ## 0.20
 
+- FIX: attachments of inbox opened with the viewer chosen for their type, not the best one :   0.20.1
+  - the choice of the user (tab « Opening of files »), else the one of the administrator, comes first: inbox opens
+    it, as the lists of documents do; the other viewers allowed stay in « Open with… »
+
 - NEW: CSV and text files edited with the office server :   0.20.0
   - the pencil opens CSV and TXT in Collabora Online, ONLYOFFICE or Euro-Office, the viewers of DocStudio keep
     showing them (table, text)

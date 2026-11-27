@@ -38,7 +38,7 @@ class DocStudioAssociationsTest extends TestCase
 	{
 		global $conf;
 
-		foreach (array('DOCSTUDIO_VIEW_PDF', 'DOCSTUDIO_VIEW_PDF_CHOICES', 'DOCSTUDIO_VIEW_CSV', 'DOCSTUDIO_VIEW_CSV_CHOICES') as $name) {
+		foreach (array('DOCSTUDIO_VIEW_PDF', 'DOCSTUDIO_VIEW_PDF_CHOICES', 'DOCSTUDIO_VIEW_CSV', 'DOCSTUDIO_VIEW_CSV_CHOICES', 'DOCSTUDIO_VIEW_XLSX', 'DOCSTUDIO_VIEW_XLSX_CHOICES') as $name) {
 			$this->saved[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
 			unset($conf->global->$name);
 		}
@@ -118,6 +118,54 @@ class DocStudioAssociationsTest extends TestCase
 		// A preference outside of the choices is ignored
 		$someone->conf->DOCSTUDIO_VIEW_PDF = 'csv';
 		$this->assertSame(DocStudio::HANDLER_DOLIBARR, $registry->getHandler('pdf', $someone));
+	}
+
+	/**
+	 * Attachments of inbox: the handler of the user, else of the administrator, comes first (inbox opens the first one)
+	 *
+	 * @return void
+	 */
+	public function testInboxViewersOrder()
+	{
+		global $db, $conf, $user;
+
+		dol_include_once('/docstudio/class/actions_docstudio.class.php');
+		$registry = new DocStudio($db);
+		$viewers = $registry->getViewersFor('xlsx', 1000);
+		if (!isModEnabled('docstudio') || $registry->getProvider('inbox') === null || !isset($viewers['wopi'], $viewers['office'])) {
+			$this->markTestSkipped('Needs inbox and the office server set up on the test database');
+		}
+		// A mail the office server may read (not in a protected mailbox)
+		dol_include_once('/docstudio/class/docstudioinboxprovider.class.php');
+		$row = $db->getRow("SELECT m.rowid FROM ".$db->prefix()."inbox_mail as m INNER JOIN ".$db->prefix()."inbox_account as a ON a.rowid = m.fk_account ORDER BY m.rowid DESC");
+		$mail = is_object($row) ? (int) $row->rowid : 0;
+		if (!$mail || DocStudioInboxProvider::needsSession($db, $mail)) {
+			$this->markTestSkipped('Needs a mail of a mailbox not protected in the test database');
+		}
+		$first = function () use ($db, $mail) {
+			$hooks = new ActionsDocStudio($db);
+			$object = null;
+			$action = '';
+			$hm = null;
+			$hooks->inboxAttachmentViewers(array('mail' => $mail, 'attachments' => array(1 => array('part' => 1, 'name' => 'a.xlsx', 'extension' => 'xlsx', 'size' => 1000))), $object, $action, $hm);
+
+			return array_column($hooks->results['inboxAttachmentViewers'][1], 'code');
+		};
+		$savedConf = $user->conf;
+		try {
+			$user->conf = new stdClass();
+			// Nothing chosen: the best viewer alone
+			$this->assertSame(array('wopi'), $first());
+			// The administrator chooses Office and leaves the office server to the users: Office first
+			$conf->global->DOCSTUDIO_VIEW_XLSX = 'office';
+			$conf->global->DOCSTUDIO_VIEW_XLSX_CHOICES = 'wopi';
+			$this->assertSame(array('office', 'wopi'), $first());
+			// The user chooses the office server: it comes first
+			$user->conf->DOCSTUDIO_VIEW_XLSX = 'wopi';
+			$this->assertSame(array('wopi', 'office'), $first());
+		} finally {
+			$user->conf = $savedConf;
+		}
 	}
 
 	/**
